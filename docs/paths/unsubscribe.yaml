@@ -1,0 +1,29 @@
+get:
+  tags:
+    - subscription
+  summary: Unsubscribe from release notifications
+  description: Unsubscribes an email from release notifications using the token sent in emails.
+  operationId: unsubscribe
+  security: []
+  parameters:
+    - name: token
+      in: path
+      description: Unsubscribe token
+      required: true
+      schema:
+        type: string
+  responses:
+    '200':
+      description: Unsubscribed successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Unsubscribed successfully
+    '400':
+      description: Invalid token
+    '404':
+      description: Token not found

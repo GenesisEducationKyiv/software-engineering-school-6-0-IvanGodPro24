@@ -1,0 +1,26 @@
+SubscribeRequest:
+  type: object
+  required:
+    - email
+    - repo
+  properties:
+    email:
+      type: string
+      format: email
+      description: Email address to subscribe
+    repo:
+      type: string
+      description: GitHub repository in owner/repo format (e.g., golang/go)
+
+Subscription:
+  type: object
+  properties:
+    email:
+      type: string
+    repo:
+      type: string
+    confirmed:
+      type: boolean
+    last_seen_tag:
+      type: string
+      nullable: true

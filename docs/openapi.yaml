@@ -1,0 +1,31 @@
+openapi: 3.0.0
+info:
+  version: 1.0.0
+  title: GitHub Release Notification API
+  description: API for subscribing to GitHub repository release notifications via email.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+servers:
+  - url: https://github-notifier-api.onrender.com/api
+tags:
+  - name: subscription
+    description: Subscription management operations
+paths:
+  /subscribe:
+    $ref: ./paths/subscribe.yaml
+  /confirm/{token}:
+    $ref: ./paths/confirm.yaml
+  /unsubscribe/{token}:
+    $ref: ./paths/unsubscribe.yaml
+  /subscriptions:
+    $ref: ./paths/subscriptions.yaml
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+  schemas:
+    $ref: ./components/schemas.yaml

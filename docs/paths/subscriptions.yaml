@@ -1,0 +1,27 @@
+get:
+  tags:
+    - subscription
+  summary: Get subscriptions for an email
+  operationId: getSubscriptions
+  security:
+    - ApiKeyAuth: []
+  parameters:
+    - name: email
+      in: query
+      required: true
+      schema:
+        type: string
+        format: email
+  responses:
+    "200":
+      description: List of subscriptions returned
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: ../components/schemas.yaml#/Subscription
+    "401":
+      description: API key is missing
+    "403":
+      description: Invalid API key

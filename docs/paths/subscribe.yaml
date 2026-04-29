@@ -1,0 +1,21 @@
+post:
+  tags:
+    - subscription
+  summary: Subscribe to release notifications
+  operationId: subscribe
+  security: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas.yaml#/SubscribeRequest
+  responses:
+    '200':
+      description: Subscription created. Confirmation email sent.
+    '400':
+      description: Invalid input
+    '404':
+      description: Repository not found on GitHub
+    '409':
+      description: Email already subscribed
