@@ -43,8 +43,8 @@ The fastest way to get the project running locally:
 
 **1. Clone the repository:**
 ```bash
-git clone https://github.com/IvanGodPro24/github-release-notification-api.git
-cd github-release-notification-api
+git clone https://github.com/GenesisEducationKyiv/software-engineering-school-6-0-IvanGodPro24.git
+cd software-engineering-school-6-0-IvanGodPro24
 ```
 
 **2. Set up environment variables:**
