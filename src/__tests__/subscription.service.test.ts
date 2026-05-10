@@ -1,40 +1,49 @@
 import { jest } from '@jest/globals';
+import { Repository, Subscription } from '@prisma/client';
+import {
+  ISubscriptionEmailService,
+  SubscriptionService,
+} from '../services/subscription.service.js';
+import { TrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
+import { SubscriptionRepository } from '../repositories/subscription.repository.js';
+import { IGitHubClient } from '../services/github.service.js';
 
-jest.unstable_mockModule('../db/client.js', () => ({
-  prisma: {
-    repository: {
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      upsert: jest.fn(),
-    },
-    subscription: {
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      findMany: jest.fn(),
-    },
-  },
-}));
+const mockRepoRepository = {
+  upsert: jest.fn(),
+  findWithActiveSubscriptions: jest.fn(),
+  updateLastSeenTag: jest.fn(),
+} as unknown as jest.Mocked<TrackedRepoRepository>;
 
-jest.unstable_mockModule('../services/subscription-email.service.js', () => ({
+const mockGithubClient = {
+  checkRepoExists: jest.fn(),
+  getLatestRelease: jest.fn(),
+} as jest.Mocked<IGitHubClient>;
+
+const mockSubscriptionRepository = {
+  findByEmailAndRepoId: jest.fn(),
+  findByConfirmToken: jest.fn(),
+  findByUnsubscribeToken: jest.fn(),
+  create: jest.fn(),
+  updateStatus: jest.fn(),
+  findActiveByEmailWithRepo: jest.fn(),
+} as unknown as jest.Mocked<SubscriptionRepository>;
+
+const mockEmailService = {
   sendConfirmEmail: jest.fn(),
-}));
-
-const { prisma } = await import('../db/client.js');
-const { sendConfirmEmail } =
-  await import('../services/subscription-email.service.js');
-const {
-  createSubscription,
-  confirmSubscription,
-  cancelSubscription,
-  getSubscriptionsByEmail,
-} = await import('../services/subscription.service.js');
-
-const asMock = (fn: unknown) => fn as ReturnType<typeof jest.fn>;
+} as jest.Mocked<ISubscriptionEmailService>;
 
 describe('subscription.service', () => {
+  let subscriptionService: SubscriptionService;
+
   beforeEach(() => {
     jest.clearAllMocks();
+
+    subscriptionService = new SubscriptionService(
+      mockRepoRepository,
+      mockSubscriptionRepository,
+      mockEmailService,
+      mockGithubClient,
+    );
   });
 
   describe('createSubscription', () => {
@@ -47,89 +56,92 @@ describe('subscription.service', () => {
         repositoryId: 'repo-1',
       };
 
-      asMock(prisma.repository.upsert).mockResolvedValue(repo);
-      asMock(prisma.subscription.findUnique).mockResolvedValue(null);
-      asMock(prisma.subscription.create).mockResolvedValue(subscription);
+      mockGithubClient.checkRepoExists.mockResolvedValue();
 
-      await createSubscription('test@test.com', 'golang/go');
+      mockRepoRepository.upsert.mockResolvedValue(
+        repo as unknown as Repository,
+      );
+      mockSubscriptionRepository.findByEmailAndRepoId.mockResolvedValue(null);
+      mockSubscriptionRepository.create.mockResolvedValue(
+        subscription as unknown as Subscription,
+      );
 
-      expect(prisma.repository.upsert).toHaveBeenCalledWith({
-        where: { name: 'golang/go' },
-        update: {},
-        create: { name: 'golang/go' },
-      });
-      expect(prisma.subscription.create).toHaveBeenCalled();
-      expect(sendConfirmEmail).toHaveBeenCalledWith(
+      await subscriptionService.createSubscription(
+        'test@test.com',
+        'golang/go',
+      );
+
+      expect(mockGithubClient.checkRepoExists).toHaveBeenCalledWith(
+        'golang',
+        'go',
+      );
+      expect(mockRepoRepository.upsert).toHaveBeenCalledWith('golang/go');
+      expect(mockSubscriptionRepository.create).toHaveBeenCalledWith(
+        'test@test.com',
+        'repo-1',
+      );
+      expect(mockEmailService.sendConfirmEmail).toHaveBeenCalledWith(
         'test@test.com',
         'golang/go',
         'token-123',
       );
     });
 
-    it('does not create repo if it already exists', async () => {
-      const repo = { id: 'repo-1', name: 'golang/go' };
-      const subscription = {
-        id: 'sub-1',
-        email: 'test@test.com',
-        confirmToken: 'token-123',
-      };
-
-      asMock(prisma.repository.findUnique).mockResolvedValue(repo);
-      asMock(prisma.subscription.findUnique).mockResolvedValue(null);
-      asMock(prisma.subscription.create).mockResolvedValue(subscription);
-
-      await createSubscription('test@test.com', 'golang/go');
-
-      expect(prisma.repository.create).not.toHaveBeenCalled();
-    });
-
     it('throws 409 if subscription already exists', async () => {
-      asMock(prisma.repository.upsert).mockResolvedValue({
+      mockRepoRepository.upsert.mockResolvedValue({
         id: 'repo-1',
         name: 'golang/go',
-      });
-      asMock(prisma.subscription.findUnique).mockResolvedValue({
+      } as unknown as Repository);
+
+      mockSubscriptionRepository.findByEmailAndRepoId.mockResolvedValue({
         id: 'sub-1',
         status: 'PENDING',
-      });
+      } as unknown as Subscription);
 
       await expect(
-        createSubscription('test@test.com', 'golang/go'),
+        subscriptionService.createSubscription('test@test.com', 'golang/go'),
       ).rejects.toMatchObject({ status: 409 });
     });
   });
 
   describe('confirmSubscription', () => {
     it('confirms the subscription', async () => {
-      asMock(prisma.subscription.findUnique).mockResolvedValue({
+      mockSubscriptionRepository.findByConfirmToken.mockResolvedValue({
         id: 'sub-1',
         status: 'PENDING',
-      });
-      asMock(prisma.subscription.update).mockResolvedValue({});
+      } as unknown as Subscription);
 
-      await confirmSubscription('token-123');
+      mockSubscriptionRepository.updateStatus.mockResolvedValue(
+        {} as unknown as Subscription,
+      );
 
-      expect(prisma.subscription.update).toHaveBeenCalledWith({
-        where: { id: 'sub-1' },
-        data: { status: 'ACTIVE' },
-      });
+      await subscriptionService.confirmSubscription('token-123');
+
+      expect(mockSubscriptionRepository.updateStatus).toHaveBeenCalledWith(
+        'sub-1',
+        'ACTIVE',
+      );
     });
 
     it('throws 404 if token is not found', async () => {
-      asMock(prisma.subscription.findUnique).mockResolvedValue(null);
+      mockSubscriptionRepository.findByConfirmToken.mockResolvedValue(null);
 
-      await expect(confirmSubscription('bad-token')).rejects.toMatchObject({
+      await expect(
+        subscriptionService.confirmSubscription('bad-token'),
+      ).rejects.toMatchObject({
         status: 404,
       });
     });
 
     it('throws 400 if subscription is already confirmed', async () => {
-      asMock(prisma.subscription.findUnique).mockResolvedValue({
+      mockSubscriptionRepository.findByConfirmToken.mockResolvedValue({
         id: 'sub-1',
         status: 'ACTIVE',
-      });
+      } as unknown as Subscription);
 
-      await expect(confirmSubscription('token-123')).rejects.toMatchObject({
+      await expect(
+        subscriptionService.confirmSubscription('token-123'),
+      ).rejects.toMatchObject({
         status: 400,
       });
     });
@@ -137,35 +149,42 @@ describe('subscription.service', () => {
 
   describe('cancelSubscription', () => {
     it('unsubscribes the user', async () => {
-      asMock(prisma.subscription.findUnique).mockResolvedValue({
+      mockSubscriptionRepository.findByUnsubscribeToken.mockResolvedValue({
         id: 'sub-1',
         status: 'ACTIVE',
-      });
-      asMock(prisma.subscription.update).mockResolvedValue({});
+      } as unknown as Subscription);
 
-      await cancelSubscription('unsub-token');
+      mockSubscriptionRepository.updateStatus.mockResolvedValue(
+        {} as unknown as Subscription,
+      );
 
-      expect(prisma.subscription.update).toHaveBeenCalledWith({
-        where: { id: 'sub-1' },
-        data: { status: 'UNSUBSCRIBED' },
-      });
+      await subscriptionService.cancelSubscription('unsub-token');
+
+      expect(mockSubscriptionRepository.updateStatus).toHaveBeenCalledWith(
+        'sub-1',
+        'UNSUBSCRIBED',
+      );
     });
 
     it('throws 404 if token is not found', async () => {
-      asMock(prisma.subscription.findUnique).mockResolvedValue(null);
+      mockSubscriptionRepository.findByUnsubscribeToken.mockResolvedValue(null);
 
-      await expect(cancelSubscription('bad-token')).rejects.toMatchObject({
+      await expect(
+        subscriptionService.cancelSubscription('bad-token'),
+      ).rejects.toMatchObject({
         status: 404,
       });
     });
 
     it('throws 400 if already unsubscribed', async () => {
-      asMock(prisma.subscription.findUnique).mockResolvedValue({
+      mockSubscriptionRepository.findByUnsubscribeToken.mockResolvedValue({
         id: 'sub-1',
         status: 'UNSUBSCRIBED',
-      });
+      } as unknown as Subscription);
 
-      await expect(cancelSubscription('unsub-token')).rejects.toMatchObject({
+      await expect(
+        subscriptionService.cancelSubscription('unsub-token'),
+      ).rejects.toMatchObject({
         status: 400,
       });
     });
@@ -173,15 +192,16 @@ describe('subscription.service', () => {
 
   describe('getSubscriptionsByEmail', () => {
     it('returns subscriptions in the correct format', async () => {
-      asMock(prisma.subscription.findMany).mockResolvedValue([
+      mockSubscriptionRepository.findActiveByEmailWithRepo.mockResolvedValue([
         {
           email: 'test@test.com',
           status: 'ACTIVE',
           repository: { name: 'golang/go', lastSeenTag: 'v1.22.0' },
-        },
+        } as unknown as Subscription & { repository: Repository },
       ]);
 
-      const result = await getSubscriptionsByEmail('test@test.com');
+      const result =
+        await subscriptionService.getSubscriptionsByEmail('test@test.com');
 
       expect(result).toEqual([
         {
@@ -194,9 +214,12 @@ describe('subscription.service', () => {
     });
 
     it('returns an empty array if no subscriptions found', async () => {
-      asMock(prisma.subscription.findMany).mockResolvedValue([]);
+      mockSubscriptionRepository.findActiveByEmailWithRepo.mockResolvedValue(
+        [],
+      );
 
-      const result = await getSubscriptionsByEmail('noone@test.com');
+      const result =
+        await subscriptionService.getSubscriptionsByEmail('noone@test.com');
 
       expect(result).toEqual([]);
     });

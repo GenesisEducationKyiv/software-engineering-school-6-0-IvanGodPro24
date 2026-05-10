@@ -1,88 +1,94 @@
-import cron from 'node-cron';
-import { prisma } from '../db/client.js';
-import { getLatestRelease } from './github.service.js';
-import { emailQueue } from '../queue/email.queue.js';
+import { TrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
+import { SubscriptionRepository } from '../repositories/subscription.repository.js';
+import { IGitHubClient } from './github.service.js';
 
-const scanRepositories = async () => {
-  try {
-    const repositories = await prisma.repository.findMany({
-      where: {
-        subscriptions: {
-          some: {
-            status: 'ACTIVE',
-          },
-        },
-      },
-    });
+export type BulkEmailJob = {
+  name: string;
+  data: {
+    email: string;
+    repoName: string;
+    tag: string;
+    unsubscribeToken: string;
+  };
+  opts?: {
+    attempts: number;
+    backoff: {
+      type: string;
+      delay: number;
+    };
+  };
+};
 
-    console.log(`[Scanner] Found ${repositories.length} repositories`);
+export interface IEmailQueue {
+  addBulkEmails(jobs: BulkEmailJob[]): Promise<void>;
+}
 
-    for (const repo of repositories) {
-      const [owner, repoName] = repo.name.split('/');
+export class ScannerService {
+  constructor(
+    private readonly repoRepository: TrackedRepoRepository,
+    private readonly subscriptionRepository: SubscriptionRepository,
+    private readonly githubClient: IGitHubClient,
+    private readonly emailQueue: IEmailQueue,
+  ) {}
 
-      try {
-        const latestTag = await getLatestRelease(owner, repoName);
+  scanRepositories = async () => {
+    try {
+      const repositories =
+        await this.repoRepository.findWithActiveSubscriptions();
 
-        if (!latestTag) continue;
+      console.log(`[Scanner] Found ${repositories.length} repositories`);
 
-        if (!repo.lastSeenTag) {
-          await prisma.repository.update({
-            where: { id: repo.id },
-            data: { lastSeenTag: latestTag },
-          });
-          continue;
-        }
+      for (const repo of repositories) {
+        const [owner, repoName] = repo.name.split('/');
 
-        if (repo.lastSeenTag !== latestTag) {
-          console.log(`[Scanner] New release for ${repo.name}: ${latestTag}`);
-
-          await prisma.repository.update({
-            where: { id: repo.id },
-            data: { lastSeenTag: latestTag },
-          });
-
-          const subscriptions = await prisma.subscription.findMany({
-            where: {
-              repositoryId: repo.id,
-              status: 'ACTIVE',
-            },
-          });
-
-          await emailQueue.addBulk(
-            subscriptions.map((sub) => ({
-              name: 'send-email',
-              data: {
-                email: sub.email,
-                repoName: repo.name,
-                tag: latestTag,
-                unsubscribeToken: sub.unsubscribeToken,
-              },
-              opts: {
-                attempts: 3,
-                backoff: {
-                  type: 'exponential',
-                  delay: 5000,
-                },
-              },
-            })),
+        try {
+          const latestTag = await this.githubClient.getLatestRelease(
+            owner,
+            repoName,
           );
+
+          if (!latestTag) continue;
+
+          if (!repo.lastSeenTag) {
+            await this.repoRepository.updateLastSeenTag(repo.id, latestTag);
+            continue;
+          }
+
+          if (repo.lastSeenTag !== latestTag) {
+            console.log(`[Scanner] New release for ${repo.name}: ${latestTag}`);
+
+            await this.repoRepository.updateLastSeenTag(repo.id, latestTag);
+
+            const subscriptions =
+              await this.subscriptionRepository.findActiveByRepoId(repo.id);
+
+            await this.emailQueue.addBulkEmails(
+              subscriptions.map((sub) => ({
+                name: 'send-email',
+                data: {
+                  email: sub.email,
+                  repoName: repo.name,
+                  tag: latestTag,
+                  unsubscribeToken: sub.unsubscribeToken,
+                },
+                opts: {
+                  attempts: 3,
+                  backoff: { type: 'exponential', delay: 5000 },
+                },
+              })),
+            );
+          }
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : 'Unknown error';
+          console.error(`[Scanner] Error checking ${repo.name}:`, message);
         }
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Unknown error';
-        console.error(`[Scanner] Error checking ${repo.name}:`, message);
       }
+    } catch (globalError) {
+      console.error(
+        '[Scanner] Critical database error during scan:',
+        globalError,
+      );
     }
-  } catch (globalError) {
-    console.error(
-      '[Scanner] Critical database error during scan:',
-      globalError,
-    );
-  }
-};
-
-export const startScanner = () => {
-  console.log('Scanner initialized');
-
-  cron.schedule('*/10 * * * *', scanRepositories);
-};
+  };
+}

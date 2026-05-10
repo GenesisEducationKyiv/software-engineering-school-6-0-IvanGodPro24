@@ -1,4 +1,5 @@
 import { jest } from '@jest/globals';
+import { ICacheService } from '../services/cache.service.js';
 
 const mockGet = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 
@@ -10,38 +11,44 @@ jest.unstable_mockModule('axios', () => ({
   isAxiosError: jest.fn(),
 }));
 
-jest.unstable_mockModule('../services/cache.service.js', () => ({
-  getCache: jest.fn(),
-  setCache: jest.fn(),
-}));
-
 const { default: axios } = await import('axios');
-const { getCache, setCache } = await import('../services/cache.service.js');
-const { checkRepoExists, getLatestRelease } =
-  await import('../services/github.service.js');
+const { GitHubClient } = await import('../services/github.service.js');
 
 const asMock = (fn: unknown) => fn as ReturnType<typeof jest.fn>;
 
 describe('github.service', () => {
+  let githubClient: InstanceType<typeof GitHubClient>;
+
+  const mockCacheService = {
+    get: jest.fn(),
+    set: jest.fn(),
+  } as unknown as jest.Mocked<ICacheService>;
+
   beforeEach(() => {
     jest.clearAllMocks();
 
-    asMock(getCache).mockResolvedValue(null);
-    asMock(setCache).mockResolvedValue(undefined);
+    mockCacheService.get.mockResolvedValue(null);
+    mockCacheService.set.mockResolvedValue(undefined);
+
+    githubClient = new GitHubClient(mockCacheService);
   });
 
   describe('checkRepoExists', () => {
     it('does not throw if repository exists', async () => {
       mockGet.mockResolvedValue({ status: 200 });
 
-      await expect(checkRepoExists('golang', 'go')).resolves.toBeUndefined();
+      await expect(
+        githubClient.checkRepoExists('golang', 'go'),
+      ).resolves.toBeUndefined();
     });
 
     it('throws 404 if repository is not found', async () => {
       mockGet.mockRejectedValue({ response: { status: 404 } });
       asMock(axios.isAxiosError).mockReturnValue(true);
 
-      await expect(checkRepoExists('bad', 'repo')).rejects.toMatchObject({
+      await expect(
+        githubClient.checkRepoExists('bad', 'repo'),
+      ).rejects.toMatchObject({
         status: 404,
       });
     });
@@ -50,7 +57,9 @@ describe('github.service', () => {
       mockGet.mockRejectedValue({ response: { status: 429 } });
       asMock(axios.isAxiosError).mockReturnValue(true);
 
-      await expect(checkRepoExists('golang', 'go')).rejects.toMatchObject({
+      await expect(
+        githubClient.checkRepoExists('golang', 'go'),
+      ).rejects.toMatchObject({
         status: 429,
       });
     });
@@ -60,18 +69,28 @@ describe('github.service', () => {
     it('returns tag_name from response', async () => {
       mockGet.mockResolvedValue({ data: { tag_name: 'v1.22.0' } });
 
-      const tag = await getLatestRelease('golang', 'go');
+      const tag = await githubClient.getLatestRelease('golang', 'go');
 
       expect(tag).toBe('v1.22.0');
+
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        'repo:golang/go:latest',
+        'v1.22.0',
+      );
     });
 
     it('returns null if repository has no releases (404)', async () => {
       mockGet.mockRejectedValue({ response: { status: 404 } });
       asMock(axios.isAxiosError).mockReturnValue(true);
 
-      const tag = await getLatestRelease('golang', 'go');
+      const tag = await githubClient.getLatestRelease('golang', 'go');
 
       expect(tag).toBeNull();
+
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        'repo:golang/go:latest',
+        null,
+      );
     });
   });
 });

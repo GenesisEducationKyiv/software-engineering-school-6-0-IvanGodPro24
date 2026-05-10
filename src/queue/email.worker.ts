@@ -1,6 +1,6 @@
 import { redis } from './redis.js';
 import { Worker, Job } from 'bullmq';
-import { sendNewReleaseEmail } from '../services/subscription-email.service.js';
+import { subscriptionEmailService } from '../container.js';
 
 type EmailJobData = {
   email: string;
@@ -12,7 +12,13 @@ type EmailJobData = {
 const processEmailJob = async (job: Job<EmailJobData>): Promise<void> => {
   const { email, repoName, tag, unsubscribeToken } = job.data;
   console.log(`[Worker] Sending email to ${email}`);
-  await sendNewReleaseEmail(email, repoName, tag, unsubscribeToken);
+
+  await subscriptionEmailService.sendNewReleaseEmail(
+    email,
+    repoName,
+    tag,
+    unsubscribeToken,
+  );
 };
 
 export const emailWorker = new Worker('email-queue', processEmailJob, {

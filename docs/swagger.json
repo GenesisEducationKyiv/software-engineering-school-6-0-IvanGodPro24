@@ -1,1 +1,244 @@
-{}
+{
+  "openapi": "3.0.0",
+  "info": {
+    "version": "1.0.0",
+    "title": "GitHub Release Notification API",
+    "description": "API for subscribing to GitHub repository release notifications via email.",
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://github-notifier-api.onrender.com/api"
+    }
+  ],
+  "tags": [
+    {
+      "name": "subscription",
+      "description": "Subscription management operations"
+    }
+  ],
+  "paths": {
+    "/subscribe": {
+      "post": {
+        "tags": [
+          "subscription"
+        ],
+        "summary": "Subscribe to release notifications",
+        "operationId": "subscribe",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscribeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Subscription created. Confirmation email sent."
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "404": {
+            "description": "Repository not found on GitHub"
+          },
+          "409": {
+            "description": "Email already subscribed"
+          }
+        }
+      }
+    },
+    "/confirm/{token}": {
+      "get": {
+        "tags": [
+          "subscription"
+        ],
+        "summary": "Confirm email subscription",
+        "description": "Confirms a subscription using the token sent in the confirmation email.",
+        "operationId": "confirmSubscription",
+        "security": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "description": "Confirmation token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscription confirmed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Subscription confirmed successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid token"
+          },
+          "404": {
+            "description": "Token not found"
+          }
+        }
+      }
+    },
+    "/unsubscribe/{token}": {
+      "get": {
+        "tags": [
+          "subscription"
+        ],
+        "summary": "Unsubscribe from release notifications",
+        "description": "Unsubscribes an email from release notifications using the token sent in emails.",
+        "operationId": "unsubscribe",
+        "security": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "description": "Unsubscribe token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unsubscribed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Unsubscribed successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid token"
+          },
+          "404": {
+            "description": "Token not found"
+          }
+        }
+      }
+    },
+    "/subscriptions": {
+      "get": {
+        "tags": [
+          "subscription"
+        ],
+        "summary": "Get subscriptions for an email",
+        "operationId": "getSubscriptions",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "email",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "email"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of subscriptions returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Subscription"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key is missing"
+          },
+          "403": {
+            "description": "Invalid API key"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key"
+      }
+    },
+    "schemas": {
+      "SubscribeRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "repo"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email address to subscribe"
+          },
+          "repo": {
+            "type": "string",
+            "description": "GitHub repository in owner/repo format (e.g., golang/go)"
+          }
+        }
+      },
+      "Subscription": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "repo": {
+            "type": "string"
+          },
+          "confirmed": {
+            "type": "boolean"
+          },
+          "last_seen_tag": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      }
+    }
+  }
+}

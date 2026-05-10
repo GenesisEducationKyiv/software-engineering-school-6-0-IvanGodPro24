@@ -1,10 +1,11 @@
 import express from 'express';
+import cron from 'node-cron';
 import { metricsMiddleware, getMetrics } from './middleware/metrics.js';
 import { getEnvVar } from './utils/getEnvVar.js';
 import { notFoundHandler } from './middleware/notFoundHandler.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import rootRouter from './routes/index.js';
-import { startScanner } from './services/scanner.service.js';
+import { scannerService } from './container.js';
 import { bullBoardRouter } from './queue/dashboard.js';
 import { swaggerDocs } from './middleware/swaggerDocs.js';
 
@@ -25,7 +26,8 @@ app.use(errorHandler);
 if (process.env.NODE_ENV !== 'test') {
   import('./queue/email.worker.js').catch(console.error);
 
-  startScanner();
+  console.log('Scanner initialized');
+  cron.schedule('*/10 * * * *', scannerService.scanRepositories);
 
   app.listen(PORT, () => {
     console.log(`Server is running on ${URL}`);
