@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { HttpError } from 'http-errors';
+import { PinoLogger } from '../utils/logger.js';
+
+const logger = new PinoLogger('ErrorHandler');
 
 export const errorHandler = (
   err: Error,
@@ -16,6 +19,7 @@ export const errorHandler = (
     return;
   }
 
+  logger.error(`Unhandled error: ${err.message}`);
   res
     .status(500)
     .json({ message: 'Something went wrong!', error: err.message });

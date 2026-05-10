@@ -1,4 +1,5 @@
 import { Redis } from 'ioredis';
+import { ILogger } from '../utils/logger.js';
 
 export interface ICacheService {
   get<T>(key: string): Promise<T | null>;
@@ -8,6 +9,7 @@ export interface ICacheService {
 export class RedisCacheService implements ICacheService {
   constructor(
     private readonly redis: Redis,
+    private readonly logger: ILogger,
     private readonly ttl = 600,
   ) {}
 
@@ -15,11 +17,10 @@ export class RedisCacheService implements ICacheService {
     const data = await this.redis.get(key);
 
     if (!data) {
-      console.log(`[Cache] MISS: ${key}`);
+      this.logger.debug(`MISS: ${key}`);
       return null;
     }
-
-    console.log(`[Cache] HIT: ${key}`);
+    this.logger.debug(`HIT: ${key}`);
     return JSON.parse(data);
   }
 

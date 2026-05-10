@@ -9,19 +9,20 @@ import { GitHubClient } from './services/github.service.js';
 import { NodemailerProvider } from './services/email.service.js';
 import { SubscriptionEmailService } from './services/subscription-email.service.js';
 import { emailQueue } from './queue/email.queue.js';
-import {
-  ScannerService,
-  IEmailQueue,
-  BulkEmailJob,
-} from './services/scanner.service.js';
+import { ScannerService } from './services/scanner.service.js';
 import { RedisCacheService } from './services/cache.service.js';
+import { PinoLogger } from './utils/logger.js';
+import { EmailQueueAdapter } from './queue/email-queue.adapter.js';
 
 const trackedRepoRepository = new TrackedRepoRepository(prisma);
 const subscriptionRepository = new SubscriptionRepository(prisma);
 const nodemailerProvider = new NodemailerProvider();
 
-const cacheService = new RedisCacheService(redis);
-export const githubClient = new GitHubClient(cacheService);
+const cacheLogger = new PinoLogger('Cache');
+const scannerLogger = new PinoLogger('Scanner');
+
+const cacheService = new RedisCacheService(redis, cacheLogger);
+const githubClient = new GitHubClient(cacheService);
 
 const templateDir = path.join(process.cwd(), 'src', 'templates');
 export const subscriptionEmailService = new SubscriptionEmailService(
@@ -29,17 +30,14 @@ export const subscriptionEmailService = new SubscriptionEmailService(
   templateDir,
 );
 
-const emailQueueAdapter: IEmailQueue = {
-  addBulkEmails: async (jobs: BulkEmailJob[]) => {
-    await emailQueue.addBulk(jobs);
-  },
-};
+const emailQueueAdapter = new EmailQueueAdapter(emailQueue);
 
 export const scannerService = new ScannerService(
   trackedRepoRepository,
   subscriptionRepository,
   githubClient,
   emailQueueAdapter,
+  scannerLogger,
 );
 
 const subscriptionService = new SubscriptionService(

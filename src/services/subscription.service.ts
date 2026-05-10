@@ -2,8 +2,8 @@ import createHttpError from 'http-errors';
 import { randomUUID } from 'node:crypto';
 import { Prisma, Subscription } from '@prisma/client';
 
-import { TrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
-import { SubscriptionRepository } from '../repositories/subscription.repository.js';
+import { ITrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
+import { ISubscriptionRepository } from '../repositories/subscription.repository.js';
 import { IGitHubClient } from './github.service.js';
 
 export interface ISubscriptionEmailService {
@@ -16,8 +16,8 @@ export interface ISubscriptionEmailService {
 
 export class SubscriptionService {
   constructor(
-    private readonly repoRepository: TrackedRepoRepository,
-    private readonly subscriptionRepository: SubscriptionRepository,
+    private readonly repoRepository: ITrackedRepoRepository,
+    private readonly subscriptionRepository: ISubscriptionRepository,
     private readonly emailService: ISubscriptionEmailService,
     private readonly githubClient: IGitHubClient,
   ) {}

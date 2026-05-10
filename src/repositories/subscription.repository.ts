@@ -1,6 +1,30 @@
-import { PrismaClient, Subscription, SubscriptionStatus } from '@prisma/client';
+import {
+  PrismaClient,
+  Repository as DbRepository,
+  Subscription,
+  SubscriptionStatus,
+} from '@prisma/client';
 
-export class SubscriptionRepository {
+export interface ISubscriptionRepository {
+  findByEmailAndRepoId(
+    email: string,
+    repositoryId: string,
+  ): Promise<Subscription | null>;
+  findByConfirmToken(token: string): Promise<Subscription | null>;
+  findByUnsubscribeToken(token: string): Promise<Subscription | null>;
+  create(email: string, repositoryId: string): Promise<Subscription>;
+  updateStatus(
+    id: string,
+    status: SubscriptionStatus,
+    extraData?: Partial<Subscription>,
+  ): Promise<Subscription>;
+  findActiveByEmailWithRepo(
+    email: string,
+  ): Promise<(Subscription & { repository: DbRepository })[]>;
+  findActiveByRepoId(repositoryId: string): Promise<Subscription[]>;
+}
+
+export class SubscriptionRepository implements ISubscriptionRepository {
   constructor(private readonly db: PrismaClient) {}
 
   async findByEmailAndRepoId(
