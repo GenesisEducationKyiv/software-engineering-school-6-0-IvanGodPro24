@@ -2,26 +2,11 @@ import { ITrackedRepoRepository } from '../repositories/tracked-repo.repository.
 import { ISubscriptionRepository } from '../repositories/subscription.repository.js';
 import { IGitHubClient } from './github.service.js';
 import { ILogger } from '../utils/logger.js';
-
-export type BulkEmailJob = {
-  name: string;
-  data: {
-    email: string;
-    repoName: string;
-    tag: string;
-    unsubscribeToken: string;
-  };
-  opts?: {
-    attempts: number;
-    backoff: {
-      type: string;
-      delay: number;
-    };
-  };
-};
+import { EmailJobData } from '../queue/email.worker.js';
+import { GithubRepoId } from '../domain/github-repo-id.js';
 
 export interface IEmailQueue {
-  addBulkEmails(jobs: BulkEmailJob[]): Promise<void>;
+  addBulkEmails(jobsData: EmailJobData[]): Promise<void>;
 }
 
 export class ScannerService {
@@ -41,12 +26,12 @@ export class ScannerService {
       this.logger.info(`Found ${repositories.length} repositories`);
 
       for (const repo of repositories) {
-        const [owner, repoName] = repo.name.split('/');
+        const repoId = new GithubRepoId(repo.name);
 
         try {
           const latestTag = await this.githubClient.getLatestRelease(
-            owner,
-            repoName,
+            repoId.owner,
+            repoId.name,
           );
 
           if (!latestTag) continue;
@@ -66,17 +51,10 @@ export class ScannerService {
 
             await this.emailQueue.addBulkEmails(
               subscriptions.map((sub) => ({
-                name: 'send-email',
-                data: {
-                  email: sub.email,
-                  repoName: repo.name,
-                  tag: latestTag,
-                  unsubscribeToken: sub.unsubscribeToken,
-                },
-                opts: {
-                  attempts: 3,
-                  backoff: { type: 'exponential', delay: 5000 },
-                },
+                email: sub.email,
+                repoName: repo.name,
+                tag: latestTag,
+                unsubscribeToken: sub.unsubscribeToken,
               })),
             );
           }

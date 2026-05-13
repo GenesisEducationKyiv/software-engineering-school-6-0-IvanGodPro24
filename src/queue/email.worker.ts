@@ -3,7 +3,7 @@ import { Worker, Job } from 'bullmq';
 import { subscriptionEmailService } from '../container.js';
 import { PinoLogger } from '../utils/logger.js';
 
-type EmailJobData = {
+export type EmailJobData = {
   email: string;
   repoName: string;
   tag: string;

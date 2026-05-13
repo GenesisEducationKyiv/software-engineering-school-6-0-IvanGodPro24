@@ -5,6 +5,7 @@ import { Prisma, Subscription } from '@prisma/client';
 import { ITrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
 import { ISubscriptionRepository } from '../repositories/subscription.repository.js';
 import { IGitHubClient } from './github.service.js';
+import { GithubRepoId } from '../domain/github-repo-id.js';
 
 export interface ISubscriptionEmailService {
   sendConfirmEmail(
@@ -23,11 +24,11 @@ export class SubscriptionService {
   ) {}
 
   async createSubscription(email: string, repo: string) {
-    const [owner, repoName] = repo.split('/');
+    const repoId = new GithubRepoId(repo);
 
-    await this.githubClient.checkRepoExists(owner, repoName);
+    await this.githubClient.checkRepoExists(repoId.owner, repoId.name);
 
-    const repository = await this.repoRepository.upsert(repo);
+    const repository = await this.repoRepository.upsert(repoId.fullName);
 
     const existing = await this.subscriptionRepository.findByEmailAndRepoId(
       email,
