@@ -66,7 +66,16 @@ describe('github.service', () => {
   });
 
   describe('getLatestRelease', () => {
-    it('returns tag_name from response', async () => {
+    it('returns tag_name from cache and does not call GitHub API', async () => {
+      mockCacheService.get.mockResolvedValue('v1.20.0');
+
+      const tag = await githubClient.getLatestRelease('golang', 'go');
+
+      expect(tag).toBe('v1.20.0');
+      expect(mockGet).not.toHaveBeenCalled();
+    });
+
+    it('returns tag_name from API and caches it if cache is empty', async () => {
       mockGet.mockResolvedValue({ data: { tag_name: 'v1.22.0' } });
 
       const tag = await githubClient.getLatestRelease('golang', 'go');
@@ -79,7 +88,7 @@ describe('github.service', () => {
       );
     });
 
-    it('returns null if repository has no releases (404)', async () => {
+    it('returns null if repository has no releases (404) and caches null', async () => {
       mockGet.mockRejectedValue({ response: { status: 404 } });
       asMock(axios.isAxiosError).mockReturnValue(true);
 

@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { Repository, Subscription } from '@prisma/client';
+import { Prisma, Repository, Subscription } from '@prisma/client';
 import {
   ISubscriptionEmailService,
   SubscriptionService,
@@ -59,11 +59,11 @@ describe('subscription.service', () => {
       mockGithubClient.checkRepoExists.mockResolvedValue();
 
       mockRepoRepository.upsert.mockResolvedValue(
-        repo as unknown as Repository,
+        repo as Repository,
       );
       mockSubscriptionRepository.findByEmailAndRepoId.mockResolvedValue(null);
       mockSubscriptionRepository.create.mockResolvedValue(
-        subscription as unknown as Subscription,
+        subscription as Subscription,
       );
 
       await subscriptionService.createSubscription(
@@ -91,12 +91,12 @@ describe('subscription.service', () => {
       mockRepoRepository.upsert.mockResolvedValue({
         id: 'repo-1',
         name: 'golang/go',
-      } as unknown as Repository);
+      } as Repository);
 
       mockSubscriptionRepository.findByEmailAndRepoId.mockResolvedValue({
         id: 'sub-1',
         status: 'PENDING',
-      } as unknown as Subscription);
+      } as Subscription);
 
       await expect(
         subscriptionService.createSubscription('test@test.com', 'golang/go'),
@@ -104,15 +104,98 @@ describe('subscription.service', () => {
     });
   });
 
+  it('throws 409 if Prisma throws P2002 (race condition during create)', async () => {
+    mockGithubClient.checkRepoExists.mockResolvedValue();
+    mockRepoRepository.upsert.mockResolvedValue({
+      id: 'repo-1',
+      name: 'golang/go',
+    } as Repository);
+    mockSubscriptionRepository.findByEmailAndRepoId.mockResolvedValue(null);
+
+    const prismaError = new Prisma.PrismaClientKnownRequestError(
+      'Unique constraint failed',
+      { code: 'P2002', clientVersion: '5' },
+    );
+    mockSubscriptionRepository.create.mockRejectedValue(prismaError);
+
+    await expect(
+      subscriptionService.createSubscription('test@test.com', 'golang/go'),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('throws 409 if subscription is PENDING', async () => {
+    mockRepoRepository.upsert.mockResolvedValue({
+      id: 'repo-1',
+      name: 'golang/go',
+    } as Repository);
+    mockSubscriptionRepository.findByEmailAndRepoId.mockResolvedValue({
+      id: 'sub-1',
+      status: 'PENDING',
+    } as Subscription);
+
+    await expect(
+      subscriptionService.createSubscription('test@test.com', 'golang/go'),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('throws 409 if subscription is already ACTIVE', async () => {
+    mockRepoRepository.upsert.mockResolvedValue({
+      id: 'repo-1',
+      name: 'golang/go',
+    } as Repository);
+    mockSubscriptionRepository.findByEmailAndRepoId.mockResolvedValue({
+      id: 'sub-1',
+      status: 'ACTIVE',
+    } as Subscription);
+
+    await expect(
+      subscriptionService.createSubscription('test@test.com', 'golang/go'),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('updates status to PENDING and resends email if UNSUBSCRIBED', async () => {
+    mockGithubClient.checkRepoExists.mockResolvedValue();
+    mockRepoRepository.upsert.mockResolvedValue({
+      id: 'repo-1',
+      name: 'golang/go',
+    } as Repository);
+
+    mockSubscriptionRepository.findByEmailAndRepoId.mockResolvedValue({
+      id: 'sub-1',
+      email: 'test@test.com',
+      status: 'UNSUBSCRIBED',
+    } as Subscription);
+
+    mockSubscriptionRepository.updateStatus.mockResolvedValue({
+      id: 'sub-1',
+      email: 'test@test.com',
+      status: 'PENDING',
+      confirmToken: 'new-token',
+    } as Subscription);
+
+    await subscriptionService.createSubscription('test@test.com', 'golang/go');
+
+    expect(mockSubscriptionRepository.updateStatus).toHaveBeenCalledWith(
+      'sub-1',
+      'PENDING',
+      expect.objectContaining({ confirmToken: expect.any(String) }),
+    );
+    expect(mockEmailService.sendConfirmEmail).toHaveBeenCalledWith(
+      'test@test.com',
+      'golang/go',
+      'new-token',
+    );
+  });
+
   describe('confirmSubscription', () => {
     it('confirms the subscription', async () => {
       mockSubscriptionRepository.findByConfirmToken.mockResolvedValue({
         id: 'sub-1',
         status: 'PENDING',
-      } as unknown as Subscription);
+      } as Subscription);
 
       mockSubscriptionRepository.updateStatus.mockResolvedValue(
-        {} as unknown as Subscription,
+        {} as Subscription,
       );
 
       await subscriptionService.confirmSubscription('token-123');
@@ -137,7 +220,7 @@ describe('subscription.service', () => {
       mockSubscriptionRepository.findByConfirmToken.mockResolvedValue({
         id: 'sub-1',
         status: 'ACTIVE',
-      } as unknown as Subscription);
+      } as Subscription);
 
       await expect(
         subscriptionService.confirmSubscription('token-123'),
@@ -152,10 +235,10 @@ describe('subscription.service', () => {
       mockSubscriptionRepository.findByUnsubscribeToken.mockResolvedValue({
         id: 'sub-1',
         status: 'ACTIVE',
-      } as unknown as Subscription);
+      } as Subscription);
 
       mockSubscriptionRepository.updateStatus.mockResolvedValue(
-        {} as unknown as Subscription,
+        {} as Subscription,
       );
 
       await subscriptionService.cancelSubscription('unsub-token');
@@ -180,7 +263,7 @@ describe('subscription.service', () => {
       mockSubscriptionRepository.findByUnsubscribeToken.mockResolvedValue({
         id: 'sub-1',
         status: 'UNSUBSCRIBED',
-      } as unknown as Subscription);
+      } as Subscription);
 
       await expect(
         subscriptionService.cancelSubscription('unsub-token'),
@@ -197,7 +280,7 @@ describe('subscription.service', () => {
           email: 'test@test.com',
           status: 'ACTIVE',
           repository: { name: 'golang/go', lastSeenTag: 'v1.22.0' },
-        } as unknown as Subscription & { repository: Repository },
+        } as Subscription & { repository: Repository },
       ]);
 
       const result =
