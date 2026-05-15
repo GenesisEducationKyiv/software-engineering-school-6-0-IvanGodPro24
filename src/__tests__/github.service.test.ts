@@ -66,17 +66,38 @@ describe('github.service', () => {
   });
 
   describe('getLatestRelease', () => {
-    it('returns tag_name from cache and does not call GitHub API', async () => {
-      mockCacheService.get.mockResolvedValue('v1.20.0');
+    beforeEach(() => {
+      mockGet.mockReset();
+    });
+
+    it('returns tag_name from cache when GitHub API returns 304', async () => {
+      mockCacheService.get.mockImplementation(
+        async <T>(key: string): Promise<T | null> => {
+          if (key.endsWith(':latest')) return 'v1.20.0' as unknown as T;
+          if (key.endsWith(':etag')) return 'W/"test-etag"' as unknown as T;
+          return null;
+        },
+      );
+
+      mockGet.mockResolvedValue({ status: 304 });
 
       const tag = await githubClient.getLatestRelease('golang', 'go');
 
       expect(tag).toBe('v1.20.0');
-      expect(mockGet).not.toHaveBeenCalled();
+      expect(mockGet).toHaveBeenCalledWith('/repos/golang/go/releases/latest', {
+        headers: { 'If-None-Match': 'W/"test-etag"' },
+      });
+      expect(mockCacheService.set).not.toHaveBeenCalled();
     });
 
-    it('returns tag_name from API and caches it if cache is empty', async () => {
-      mockGet.mockResolvedValue({ data: { tag_name: 'v1.22.0' } });
+    it('returns tag_name from API and caches both tag and etag if repo updated', async () => {
+      mockCacheService.get.mockResolvedValue(null);
+
+      mockGet.mockResolvedValue({
+        status: 200,
+        data: { tag_name: 'v1.22.0' },
+        headers: { etag: 'W/"new-etag"' },
+      });
 
       const tag = await githubClient.getLatestRelease('golang', 'go');
 
@@ -86,9 +107,15 @@ describe('github.service', () => {
         'repo:golang/go:latest',
         'v1.22.0',
       );
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        'repo:golang/go:etag',
+        'W/"new-etag"',
+      );
     });
 
     it('returns null if repository has no releases (404) and caches null', async () => {
+      mockCacheService.get.mockResolvedValue(null);
+
       mockGet.mockRejectedValue({ response: { status: 404 } });
       asMock(axios.isAxiosError).mockReturnValue(true);
 
