@@ -1,4 +1,3 @@
-/* eslint-disable no-undef */
 document
   .getElementById('subscribe-form')
   .addEventListener('submit', async (e) => {
@@ -37,7 +36,6 @@ document
           data.data?.message || data.message || 'An error occurred';
         messageBox.className = 'error';
       }
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
       messageBox.textContent = 'Network error. Please try again later.';
       messageBox.className = 'error';

@@ -16,6 +16,7 @@ services:
       - '6380:6379'
   test_smtp:
     image: mailhog/mailhog
+    platform: linux/amd64
     container_name: github_notifier_test_smtp
     ports:
       - '1025:1025'
