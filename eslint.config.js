@@ -15,10 +15,15 @@ export default defineConfig([
         { argsIgnorePattern: '^_' },
       ],
     },
+  },
+  {
     files: ['public/**/*.js'],
-    env: {
-      browser: true,
-      node: false,
+    languageOptions: {
+      globals: {
+        document: 'readonly',
+        fetch: 'readonly',
+        window: 'readonly',
+      },
     },
   },
   eslintConfigPrettier,

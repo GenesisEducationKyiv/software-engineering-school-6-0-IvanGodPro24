@@ -36,7 +36,7 @@ document
           data.data?.message || data.message || 'An error occurred';
         messageBox.className = 'error';
       }
-    } catch (error) {
+    } catch {
       messageBox.textContent = 'Network error. Please try again later.';
       messageBox.className = 'error';
     } finally {
