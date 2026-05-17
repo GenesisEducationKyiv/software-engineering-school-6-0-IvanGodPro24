@@ -9,6 +9,8 @@ echo "Waiting for the database..."
 sleep 3
 
 export DATABASE_URL="postgresql://test_user:test_password@localhost:5434/test_db?schema=public"
+export SMTP_HOST="localhost"
+export SMTP_PORT="1025"
 
 echo "Applying migrations..."
 npx prisma migrate deploy

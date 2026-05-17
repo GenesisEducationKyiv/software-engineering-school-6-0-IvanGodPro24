@@ -14,3 +14,8 @@ services:
     container_name: github_notifier_test_redis
     ports:
       - '6380:6379'
+  test_smtp:
+    image: mailhog/mailhog
+    container_name: github_notifier_test_smtp
+    ports:
+      - '1025:1025'
