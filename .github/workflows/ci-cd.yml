@@ -9,7 +9,7 @@ env:
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
   REDIS_URL: redis://localhost:6379
   API_KEY: super-secret-key
-  GITHUB_TOKEN: dummy-github-token
+  GH_TOKEN: ${{ secrets.GH_TOKEN }}
   SMTP_HOST: smtp.mailtrap.io
   SMTP_PORT: 1025
   SMTP_USER: dummy-user

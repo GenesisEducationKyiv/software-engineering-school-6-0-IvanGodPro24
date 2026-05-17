@@ -86,7 +86,7 @@ APP_URL=http://localhost:3000
 API_KEY=your_super_secret_api_key
 
 # External APIs
-GITHUB_TOKEN=your_github_personal_access_token
+GH_TOKEN=your_github_personal_access_token
 
 # SMTP Configuration (see "Choosing an SMTP Service" below)
 SMTP_FROM=your_email@gmail.com

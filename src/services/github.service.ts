@@ -12,7 +12,7 @@ export class GitHubClient implements IGitHubClient {
   private readonly githubApi: AxiosInstance;
 
   constructor(private readonly cacheService: ICacheService) {
-    const githubToken = getEnvVar('GITHUB_TOKEN', '');
+    const githubToken = getEnvVar('GH_TOKEN', '');
 
     this.githubApi = axios.create({
       baseURL: 'https://api.github.com',
