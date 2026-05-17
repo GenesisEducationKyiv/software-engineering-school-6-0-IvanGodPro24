@@ -15,7 +15,8 @@
     "test:unit": "node --experimental-vm-modules node_modules/.bin/jest --testPathIgnorePatterns=\\.integration\\.test\\.ts",
     "test:integration:run": "node --experimental-vm-modules node_modules/.bin/jest \\.integration\\.test\\.ts --detectOpenHandles --runInBand",
     "test:integration": "./scripts/run-integration.sh",
-    "test": "npm run test:unit && npm run test:integration",
+    "test:e2e": "./scripts/run-e2e.sh",
+    "test": "npm run test:unit && npm run test:integration && npm run test:e2e",
     "migrate": "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
     "generate": "prisma generate",
@@ -60,6 +61,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.60.0",
     "@redocly/cli": "^2.26.0",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",

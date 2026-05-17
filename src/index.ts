@@ -1,4 +1,5 @@
 import express from 'express';
+import path from 'node:path';
 import cron from 'node-cron';
 import { metricsMiddleware, getMetrics } from './middleware/metrics.js';
 import { getEnvVar } from './utils/getEnvVar.js';
@@ -18,6 +19,8 @@ const URL = getEnvVar('APP_URL', 'http://localhost:3000');
 
 app.use(metricsMiddleware);
 app.get('/metrics', getMetrics);
+
+app.use(express.static(path.join(process.cwd(), 'public')));
 
 app.use('/api', rootRouter);
 app.use('/admin/queues', bullBoardRouter);
