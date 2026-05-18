@@ -1,6 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
 import createHttpError from 'http-errors';
-import { getEnvVar } from '../utils/getEnvVar.js';
 import { ICacheService } from './cache.service.js';
 
 export interface IGitHubClient {
@@ -9,36 +8,16 @@ export interface IGitHubClient {
 }
 
 export class GitHubClient implements IGitHubClient {
-  private readonly githubApi: AxiosInstance;
-
-  constructor(private readonly cacheService: ICacheService) {
-    const githubToken = getEnvVar('GITHUB_TOKEN', '');
-
-    this.githubApi = axios.create({
-      baseURL: 'https://api.github.com',
-      headers: {
-        Accept: 'application/vnd.github.v3+json',
-        ...(githubToken && { Authorization: `Bearer ${githubToken}` }),
-      },
-    });
-  }
+  constructor(
+    private readonly cacheService: ICacheService,
+    private readonly githubApi: AxiosInstance,
+  ) {}
 
   async checkRepoExists(owner: string, repo: string): Promise<void> {
     try {
       await this.githubApi.get(`/repos/${owner}/${repo}`);
     } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        switch (error.response.status) {
-          case 404:
-            throw createHttpError(404, 'Repository not found');
-          case 403:
-          case 429:
-            throw createHttpError(429, 'GitHub rate limit exceeded');
-          default:
-            throw createHttpError(500, `GitHub API error: ${error.message}`);
-        }
-      }
-      throw createHttpError(500, 'Internal Server Error');
+      this.handleGitHubError(error);
     }
   }
 
@@ -56,19 +35,31 @@ export class GitHubClient implements IGitHubClient {
       await this.cacheService.set(cacheKey, tag);
       return tag;
     } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        switch (error.response.status) {
-          case 404:
-            await this.cacheService.set(cacheKey, null);
-            return null;
-          case 403:
-          case 429:
-            throw createHttpError(429, 'GitHub rate limit exceeded');
-          default:
-            throw createHttpError(500, `GitHub API error: ${error.message}`);
-        }
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        await this.cacheService.set(cacheKey, null);
+        return null;
       }
-      throw createHttpError(500, 'Internal Server Error');
+
+      this.handleGitHubError(error);
     }
+  }
+
+  private handleGitHubError(error: unknown): never {
+    if (axios.isAxiosError(error) && error.response) {
+      const { status, headers } = error.response;
+
+      switch (status) {
+        case 404:
+          throw createHttpError(404, 'Repository not found');
+        case 403:
+          if (headers['x-ratelimit-remaining'] === '0') {
+            throw createHttpError(429, 'GitHub rate limit exceeded');
+          }
+          throw createHttpError(403, 'GitHub access forbidden');
+        case 429:
+          throw createHttpError(429, 'GitHub rate limit exceeded');
+      }
+    }
+    throw error;
   }
 }

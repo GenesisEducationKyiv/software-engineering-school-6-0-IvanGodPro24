@@ -1,27 +1,32 @@
+import { PrismaClient, Prisma } from '@prisma/client';
+import { UniqueConstraintError } from '../domain/errors.js';
 import {
-  PrismaClient,
-  Repository as DbRepository,
-  Subscription,
-  SubscriptionStatus,
-} from '@prisma/client';
+  SubscriptionEntity,
+  SubStatus,
+  SubscriptionWithRepoEntity,
+} from '../domain/subscription.entity.js';
 
 export interface ISubscriptionRepository {
   findByEmailAndRepoId(
     email: string,
     repositoryId: string,
-  ): Promise<Subscription | null>;
-  findByConfirmToken(token: string): Promise<Subscription | null>;
-  findByUnsubscribeToken(token: string): Promise<Subscription | null>;
-  create(email: string, repositoryId: string): Promise<Subscription>;
+  ): Promise<SubscriptionEntity | null>;
+  findByConfirmToken(token: string): Promise<SubscriptionEntity | null>;
+  findByUnsubscribeToken(token: string): Promise<SubscriptionEntity | null>;
+  create(email: string, repositoryId: string): Promise<SubscriptionEntity>;
   updateStatus(
     id: string,
-    status: SubscriptionStatus,
-    extraData?: Partial<Subscription>,
-  ): Promise<Subscription>;
-  findActiveByEmailWithRepo(
+    status: SubStatus,
+    extraData?: Partial<Pick<SubscriptionEntity, 'confirmToken'>>,
+  ): Promise<SubscriptionEntity>;
+  findByEmailAndStatusWithRepo(
     email: string,
-  ): Promise<(Subscription & { repository: DbRepository })[]>;
-  findActiveByRepoId(repositoryId: string): Promise<Subscription[]>;
+    status: SubStatus,
+  ): Promise<SubscriptionWithRepoEntity[]>;
+  findByRepoIdAndStatus(
+    repositoryId: string,
+    status: SubStatus,
+  ): Promise<SubscriptionEntity[]>;
 }
 
 export class SubscriptionRepository implements ISubscriptionRepository {
@@ -30,7 +35,7 @@ export class SubscriptionRepository implements ISubscriptionRepository {
   async findByEmailAndRepoId(
     email: string,
     repositoryId: string,
-  ): Promise<Subscription | null> {
+  ): Promise<SubscriptionEntity | null> {
     return this.db.subscription.findUnique({
       where: {
         email_repositoryId: { email, repositoryId },
@@ -38,43 +43,64 @@ export class SubscriptionRepository implements ISubscriptionRepository {
     });
   }
 
-  async findByConfirmToken(token: string): Promise<Subscription | null> {
+  async findByConfirmToken(token: string): Promise<SubscriptionEntity | null> {
     return this.db.subscription.findUnique({ where: { confirmToken: token } });
   }
 
-  async findByUnsubscribeToken(token: string): Promise<Subscription | null> {
+  async findByUnsubscribeToken(
+    token: string,
+  ): Promise<SubscriptionEntity | null> {
     return this.db.subscription.findUnique({
       where: { unsubscribeToken: token },
     });
   }
 
-  async create(email: string, repositoryId: string): Promise<Subscription> {
-    return this.db.subscription.create({
-      data: { email, repositoryId },
-    });
+  async create(
+    email: string,
+    repositoryId: string,
+  ): Promise<SubscriptionEntity> {
+    try {
+      return await this.db.subscription.create({
+        data: { email, repositoryId },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new UniqueConstraintError('Subscription already exists');
+      }
+      throw error;
+    }
   }
 
   async updateStatus(
     id: string,
-    status: SubscriptionStatus,
-    extraData: Partial<Subscription> = {},
-  ): Promise<Subscription> {
+    status: SubStatus,
+    extraData: Partial<SubscriptionEntity> = {},
+  ): Promise<SubscriptionEntity> {
     return this.db.subscription.update({
       where: { id },
       data: { status, ...extraData },
     });
   }
 
-  async findActiveByEmailWithRepo(email: string) {
+  async findByEmailAndStatusWithRepo(
+    email: string,
+    status: SubStatus,
+  ): Promise<SubscriptionWithRepoEntity[]> {
     return this.db.subscription.findMany({
-      where: { email, status: 'ACTIVE' },
+      where: { email, status },
       include: { repository: true },
     });
   }
 
-  async findActiveByRepoId(repositoryId: string) {
+  async findByRepoIdAndStatus(
+    repositoryId: string,
+    status: SubStatus,
+  ): Promise<SubscriptionEntity[]> {
     return this.db.subscription.findMany({
-      where: { repositoryId, status: 'ACTIVE' },
+      where: { repositoryId, status },
     });
   }
 }

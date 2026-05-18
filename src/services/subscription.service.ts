@@ -1,6 +1,7 @@
 import createHttpError from 'http-errors';
 import { randomUUID } from 'node:crypto';
-import { Prisma, Subscription } from '@prisma/client';
+import { UniqueConstraintError } from '../domain/errors.js';
+import { SubscriptionEntity } from '../domain/subscription.entity.js';
 
 import { ITrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
 import { ISubscriptionRepository } from '../repositories/subscription.repository.js';
@@ -12,6 +13,12 @@ export interface ISubscriptionEmailService {
     email: string,
     repoName: string,
     token: string,
+  ): Promise<void>;
+  sendNewReleaseEmail(
+    email: string,
+    repoName: string,
+    tag: string,
+    unsubscribeToken: string,
   ): Promise<void>;
 }
 
@@ -43,7 +50,7 @@ export class SubscriptionService {
   }
 
   private async handleExistingSubscription(
-    existing: Subscription,
+    existing: SubscriptionEntity,
     repoName: string,
   ) {
     switch (existing.status) {
@@ -95,10 +102,7 @@ export class SubscriptionService {
 
       return subscription;
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
+      if (error instanceof UniqueConstraintError) {
         throw createHttpError(
           409,
           'Subscription is processing or already exists.',
@@ -137,7 +141,10 @@ export class SubscriptionService {
 
   async getSubscriptionsByEmail(email: string) {
     const subscriptions =
-      await this.subscriptionRepository.findActiveByEmailWithRepo(email);
+      await this.subscriptionRepository.findByEmailAndStatusWithRepo(
+        email,
+        'ACTIVE',
+      );
 
     return subscriptions.map(({ email, repository, status }) => ({
       email,

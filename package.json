@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "start": "node dist/src/index.js",
     "start:prod": "npx prisma migrate deploy && node dist/src/index.js",
-    "start:worker": "node dist/src/queue/email.worker.js",
+    "start:worker": "node dist/src/worker.js",
     "dev": "tsx watch src/index.ts",
     "worker": "tsx src/queue/email.worker.ts",
     "test": "node --experimental-vm-modules node_modules/.bin/jest",

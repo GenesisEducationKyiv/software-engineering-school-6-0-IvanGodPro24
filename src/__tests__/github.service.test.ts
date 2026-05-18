@@ -1,28 +1,29 @@
 import { jest } from '@jest/globals';
 import { ICacheService } from '../services/cache.service.js';
-
-const mockGet = jest.fn<(...args: unknown[]) => Promise<unknown>>();
-
-jest.unstable_mockModule('axios', () => ({
-  default: {
-    create: jest.fn(() => ({ get: mockGet })),
-    isAxiosError: jest.fn(),
-  },
-  isAxiosError: jest.fn(),
-}));
-
-const { default: axios } = await import('axios');
-const { GitHubClient } = await import('../services/github.service.js');
-
-const asMock = (fn: unknown) => fn as ReturnType<typeof jest.fn>;
+import { GitHubClient } from '../services/github.service.js';
+import { AxiosInstance } from 'axios';
 
 describe('github.service', () => {
-  let githubClient: InstanceType<typeof GitHubClient>;
+  let githubClient: GitHubClient;
 
   const mockCacheService = {
     get: jest.fn(),
     set: jest.fn(),
   } as unknown as jest.Mocked<ICacheService>;
+
+  const mockAxiosGet = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+
+  const mockAxiosInstance = {
+    get: mockAxiosGet,
+  } as unknown as AxiosInstance;
+
+  const createAxiosError = (
+    status: number,
+    headers: Record<string, string> = {},
+  ) => ({
+    isAxiosError: true,
+    response: { status, headers },
+  });
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -30,12 +31,12 @@ describe('github.service', () => {
     mockCacheService.get.mockResolvedValue(null);
     mockCacheService.set.mockResolvedValue(undefined);
 
-    githubClient = new GitHubClient(mockCacheService);
+    githubClient = new GitHubClient(mockCacheService, mockAxiosInstance);
   });
 
   describe('checkRepoExists', () => {
     it('does not throw if repository exists', async () => {
-      mockGet.mockResolvedValue({ status: 200 });
+      mockAxiosGet.mockResolvedValue({ status: 200 });
 
       await expect(
         githubClient.checkRepoExists('golang', 'go'),
@@ -43,8 +44,7 @@ describe('github.service', () => {
     });
 
     it('throws 404 if repository is not found', async () => {
-      mockGet.mockRejectedValue({ response: { status: 404 } });
-      asMock(axios.isAxiosError).mockReturnValue(true);
+      mockAxiosGet.mockRejectedValue(createAxiosError(404));
 
       await expect(
         githubClient.checkRepoExists('bad', 'repo'),
@@ -54,8 +54,9 @@ describe('github.service', () => {
     });
 
     it('throws 429 on GitHub rate limit', async () => {
-      mockGet.mockRejectedValue({ response: { status: 429 } });
-      asMock(axios.isAxiosError).mockReturnValue(true);
+      mockAxiosGet.mockRejectedValue(
+        createAxiosError(403, { 'x-ratelimit-remaining': '0' }),
+      );
 
       await expect(
         githubClient.checkRepoExists('golang', 'go'),
@@ -67,7 +68,7 @@ describe('github.service', () => {
 
   describe('getLatestRelease', () => {
     it('returns tag_name from response', async () => {
-      mockGet.mockResolvedValue({ data: { tag_name: 'v1.22.0' } });
+      mockAxiosGet.mockResolvedValue({ data: { tag_name: 'v1.22.0' } });
 
       const tag = await githubClient.getLatestRelease('golang', 'go');
 
@@ -80,8 +81,7 @@ describe('github.service', () => {
     });
 
     it('returns null if repository has no releases (404)', async () => {
-      mockGet.mockRejectedValue({ response: { status: 404 } });
-      asMock(axios.isAxiosError).mockReturnValue(true);
+      mockAxiosGet.mockRejectedValue(createAxiosError(404));
 
       const tag = await githubClient.getLatestRelease('golang', 'go');
 

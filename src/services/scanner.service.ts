@@ -47,7 +47,10 @@ export class ScannerService {
             await this.repoRepository.updateLastSeenTag(repo.id, latestTag);
 
             const subscriptions =
-              await this.subscriptionRepository.findActiveByRepoId(repo.id);
+              await this.subscriptionRepository.findByRepoIdAndStatus(
+                repo.id,
+                'ACTIVE',
+              );
 
             await this.emailQueue.addBulkEmails(
               subscriptions.map((sub) => ({
