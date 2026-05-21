@@ -157,72 +157,18 @@ In Grafana, add `http://prometheus:9090` as a Prometheus data source to visualiz
 
 ## 🧪 Testing
 
-The project has separate test layers for isolated business logic, API integration, and browser-level E2E.
-
-### Requirements
-
-- Node.js v22+
-- Docker and Docker Compose
-- Playwright Chromium browser for E2E tests:
-
-```bash
-npx playwright install --with-deps chromium
-```
-
-### Test Commands
+The test suite is split into unit, integration, and Playwright E2E layers.
 
 | Command | Description |
 |---|---|
-| `npm run test:unit` | Runs Jest unit tests only. No Docker services are required. |
-| `npm run test:integration` | Starts the test PostgreSQL and Redis containers, applies Prisma migrations, runs integration tests, then removes the containers. |
-| `npm run test:e2e` | Starts the test containers, applies migrations, builds the app, runs Playwright E2E tests in Chromium, then removes the containers. |
-| `npm test` | Runs unit, integration, and E2E tests in sequence. |
+| `npm run test:unit` | Runs isolated Jest tests. |
+| `npm run test:integration` | Runs API integration tests with test PostgreSQL and Redis containers. |
+| `npm run test:e2e` | Runs Playwright browser tests against the built app. |
+| `npm test` | Runs the full test suite in sequence. |
 
-### Unit Tests
+Integration and E2E commands start and clean up their own Docker test infrastructure from `docker-compose.test.yml`. CI runs lint/build, unit, integration, and E2E checks as separate jobs before deployment.
 
-Unit tests cover isolated service logic with mocked dependencies:
-
-```bash
-npm run test:unit
-```
-
-Current unit coverage includes subscription logic, GitHub API handling, and repository scanning.
-
-### Integration Tests
-
-Integration tests use Jest + Supertest against the Express app with a real test PostgreSQL database and Redis instance:
-
-```bash
-npm run test:integration
-```
-
-The `scripts/run-integration.sh` helper starts services from `docker-compose.test.yml`, applies Prisma migrations, runs `*.integration.test.ts`, and cleans up the test containers.
-
-### E2E Tests
-
-E2E tests use Playwright against the built application and the static subscription page served from `public/`:
-
-```bash
-npm run test:e2e
-```
-
-The `scripts/run-e2e.sh` helper starts the test PostgreSQL, Redis, and MailHog SMTP containers, applies Prisma migrations, builds the project, and runs the Chromium Playwright suite from `e2e/`.
-
-If an E2E test fails, Playwright writes an HTML report to `playwright-report/`. Open it with:
-
-```bash
-npx playwright show-report
-```
-
-### Test Infrastructure
-
-The test environment is defined in `docker-compose.test.yml`:
-
-- PostgreSQL on `localhost:5434`
-- Redis on `localhost:6380`
-- MailHog SMTP on `localhost:1025`
-
-GitHub Actions runs testing as split CI jobs: lint/build, unit tests, integration tests, and E2E tests. The deploy job runs only after all test jobs pass on `main`.
+For the full local workflow, required tools, ports, helper scripts, and report handling, see [testing.md](testing.md).
 
 ---
 
