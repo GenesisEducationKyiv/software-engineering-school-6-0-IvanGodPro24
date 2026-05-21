@@ -1,5 +1,5 @@
 import { ITrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
-import { ISubscriptionRepository } from '../repositories/subscription.repository.js';
+import { ISubscriptionQueryRepository } from '../repositories/subscription-query.repository.js';
 import { IGitHubClient } from './github.service.js';
 import { ILogger } from '../utils/logger.js';
 import { EmailJobData } from '../queue/email.worker.js';
@@ -12,7 +12,7 @@ export interface IEmailQueue {
 export class ScannerService {
   constructor(
     private readonly repoRepository: ITrackedRepoRepository,
-    private readonly subscriptionRepository: ISubscriptionRepository,
+    private readonly subscriptionQueryRepository: ISubscriptionQueryRepository,
     private readonly githubClient: IGitHubClient,
     private readonly emailQueue: IEmailQueue,
     private readonly logger: ILogger,
@@ -47,7 +47,7 @@ export class ScannerService {
             await this.repoRepository.updateLastSeenTag(repo.id, latestTag);
 
             const subscriptions =
-              await this.subscriptionRepository.findByRepoIdAndStatus(
+              await this.subscriptionQueryRepository.findByRepoIdAndStatus(
                 repo.id,
                 'ACTIVE',
               );

@@ -10,9 +10,13 @@ import { NodemailerProvider } from '../services/email.service.js';
 import { SubscriptionEmailService } from '../services/subscription-email.service.js';
 import { TrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
 import { SubscriptionRepository } from '../repositories/subscription.repository.js';
+import { SubscriptionQueryRepository } from '../repositories/subscription-query.repository.js';
 
 export const trackedRepoRepository = new TrackedRepoRepository(prisma);
 export const subscriptionRepository = new SubscriptionRepository(prisma);
+export const subscriptionQueryRepository = new SubscriptionQueryRepository(
+  prisma,
+);
 
 const cacheLogger = new PinoLogger('Cache');
 

@@ -3,7 +3,6 @@ import { UniqueConstraintError } from '../domain/errors.js';
 import {
   SubscriptionEntity,
   SubStatus,
-  SubscriptionWithRepoEntity,
 } from '../domain/subscription.entity.js';
 
 export interface ISubscriptionRepository {
@@ -19,14 +18,6 @@ export interface ISubscriptionRepository {
     status: SubStatus,
     extraData?: Partial<Pick<SubscriptionEntity, 'confirmToken'>>,
   ): Promise<SubscriptionEntity>;
-  findByEmailAndStatusWithRepo(
-    email: string,
-    status: SubStatus,
-  ): Promise<SubscriptionWithRepoEntity[]>;
-  findByRepoIdAndStatus(
-    repositoryId: string,
-    status: SubStatus,
-  ): Promise<SubscriptionEntity[]>;
 }
 
 export class SubscriptionRepository implements ISubscriptionRepository {
@@ -82,25 +73,6 @@ export class SubscriptionRepository implements ISubscriptionRepository {
     return this.db.subscription.update({
       where: { id },
       data: { status, ...extraData },
-    });
-  }
-
-  async findByEmailAndStatusWithRepo(
-    email: string,
-    status: SubStatus,
-  ): Promise<SubscriptionWithRepoEntity[]> {
-    return this.db.subscription.findMany({
-      where: { email, status },
-      include: { repository: true },
-    });
-  }
-
-  async findByRepoIdAndStatus(
-    repositoryId: string,
-    status: SubStatus,
-  ): Promise<SubscriptionEntity[]> {
-    return this.db.subscription.findMany({
-      where: { repositoryId, status },
     });
   }
 }

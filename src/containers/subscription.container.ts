@@ -5,11 +5,13 @@ import {
   subscriptionRepository,
   subscriptionEmailService,
   githubClient,
+  subscriptionQueryRepository,
 } from './shared.container.js';
 
 export const subscriptionService = new SubscriptionService(
   trackedRepoRepository,
   subscriptionRepository,
+  subscriptionQueryRepository,
   subscriptionEmailService,
   githubClient,
 );

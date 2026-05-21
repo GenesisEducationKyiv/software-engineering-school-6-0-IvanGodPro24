@@ -5,6 +5,7 @@ import { SubscriptionEntity } from '../domain/subscription.entity.js';
 
 import { ITrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
 import { ISubscriptionRepository } from '../repositories/subscription.repository.js';
+import { ISubscriptionQueryRepository } from '../repositories/subscription-query.repository.js';
 import { IGitHubClient } from './github.service.js';
 import { GithubRepoId } from '../domain/github-repo-id.js';
 
@@ -26,6 +27,7 @@ export class SubscriptionService {
   constructor(
     private readonly repoRepository: ITrackedRepoRepository,
     private readonly subscriptionRepository: ISubscriptionRepository,
+    private readonly subscriptionQueryRepository: ISubscriptionQueryRepository,
     private readonly emailService: ISubscriptionEmailService,
     private readonly githubClient: IGitHubClient,
   ) {}
@@ -141,7 +143,7 @@ export class SubscriptionService {
 
   async getSubscriptionsByEmail(email: string) {
     const subscriptions =
-      await this.subscriptionRepository.findByEmailAndStatusWithRepo(
+      await this.subscriptionQueryRepository.findByEmailAndStatusWithRepo(
         email,
         'ACTIVE',
       );

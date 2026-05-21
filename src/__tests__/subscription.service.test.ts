@@ -1,5 +1,8 @@
 import { jest } from '@jest/globals';
-import { SubscriptionEntity, TrackedRepoEntity } from '../domain/subscription.entity.js';
+import {
+  SubscriptionEntity,
+  TrackedRepoEntity,
+} from '../domain/subscription.entity.js';
 import {
   ISubscriptionEmailService,
   SubscriptionService,
@@ -7,6 +10,7 @@ import {
 import { TrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
 import { SubscriptionRepository } from '../repositories/subscription.repository.js';
 import { IGitHubClient } from '../services/github.service.js';
+import { SubscriptionQueryRepository } from '../repositories/subscription-query.repository.js';
 
 const mockRepoRepository = {
   upsert: jest.fn(),
@@ -29,6 +33,11 @@ const mockSubscriptionRepository = {
   findByRepoIdAndStatus: jest.fn(),
 } as unknown as jest.Mocked<SubscriptionRepository>;
 
+const mockSubscriptionQueryRepository = {
+  findByEmailAndStatusWithRepo: jest.fn(),
+  findByRepoIdAndStatus: jest.fn(),
+} as unknown as jest.Mocked<SubscriptionQueryRepository>;
+
 const mockEmailService = {
   sendConfirmEmail: jest.fn(),
   sendNewReleaseEmail: jest.fn(),
@@ -43,6 +52,7 @@ describe('subscription.service', () => {
     subscriptionService = new SubscriptionService(
       mockRepoRepository,
       mockSubscriptionRepository,
+      mockSubscriptionQueryRepository,
       mockEmailService,
       mockGithubClient,
     );
@@ -194,7 +204,7 @@ describe('subscription.service', () => {
 
   describe('getSubscriptionsByEmail', () => {
     it('returns subscriptions in the correct format', async () => {
-      mockSubscriptionRepository.findByEmailAndStatusWithRepo.mockResolvedValue(
+      mockSubscriptionQueryRepository.findByEmailAndStatusWithRepo.mockResolvedValue(
         [
           {
             email: 'test@test.com',
@@ -219,12 +229,12 @@ describe('subscription.service', () => {
       ]);
 
       expect(
-        mockSubscriptionRepository.findByEmailAndStatusWithRepo,
+        mockSubscriptionQueryRepository.findByEmailAndStatusWithRepo,
       ).toHaveBeenCalledWith('test@test.com', 'ACTIVE');
     });
 
     it('returns an empty array if no subscriptions found', async () => {
-      mockSubscriptionRepository.findByEmailAndStatusWithRepo.mockResolvedValue(
+      mockSubscriptionQueryRepository.findByEmailAndStatusWithRepo.mockResolvedValue(
         [],
       );
 
