@@ -1,8 +1,19 @@
 import { test, expect } from '@playwright/test';
 import { HomePage } from './pages/home.page.js';
+import { prisma } from '../src/db/client.js';
 
 test.describe('Subscription e2e', () => {
   let homePage: HomePage;
+
+  test.afterAll(async () => {
+    await prisma.subscription.deleteMany({
+      where: {
+        email: { contains: '@e2e.com' },
+      },
+    });
+
+    await prisma.$disconnect();
+  });
 
   test.beforeEach(async ({ page }) => {
     homePage = new HomePage(page);
