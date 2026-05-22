@@ -139,13 +139,8 @@ The local test infrastructure is defined in `docker-compose.test.yml`.
 | Redis | `github_notifier_test_redis` | `localhost:6380` |
 | MailHog SMTP | `github_notifier_test_smtp` | `localhost:1025` |
 
-The integration and E2E scripts clean up containers and volumes after successful runs.
-
-If a script is interrupted, clean up manually:
-
-```bash
-docker compose -f docker-compose.test.yml down -v --remove-orphans
-```
+The integration and E2E scripts automatically clean up containers and volumes after execution using Bash `trap EXIT`.
+Even if a script is interrupted or fails due to a broken test, all test Docker infrastructure is completely wiped out, leaving your local environment clean.
 
 ---
 

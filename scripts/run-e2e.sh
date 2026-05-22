@@ -2,6 +2,8 @@
 
 set -e
 
+trap 'echo "Deleting test containers..."; docker compose -f docker-compose.test.yml down -v --remove-orphans' EXIT
+
 echo "Setting up the test containers for E2E..."
 docker compose -f docker-compose.test.yml up -d
 
@@ -20,8 +22,5 @@ npm run build
 
 echo "Running Playwright E2E tests..."
 npx playwright test
-
-echo "Deleting test containers..."
-docker compose -f docker-compose.test.yml down -v --remove-orphans
 
 echo "The E2E tests have been successfully completed!"

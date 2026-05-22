@@ -2,6 +2,8 @@
 
 set -e
 
+trap 'echo "Deleting test containers..."; docker compose -f docker-compose.test.yml down -v --remove-orphans' EXIT
+
 echo "Starting the test containers (DB and Redis)..."
 docker compose -f docker-compose.test.yml up -d
 
@@ -17,8 +19,5 @@ npx prisma migrate deploy
 
 echo "Running the integration tests..."
 npm run test:integration:run
-
-echo "Deleting test containers..."
-docker compose -f docker-compose.test.yml down -v --remove-orphans
 
 echo "Integration tests have been successfully completed!"
