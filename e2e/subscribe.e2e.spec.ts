@@ -5,13 +5,15 @@ import { prisma } from '../src/db/client.js';
 test.describe('Subscription e2e', () => {
   let homePage: HomePage;
 
-  test.afterAll(async () => {
+  test.beforeAll(async () => {
     await prisma.subscription.deleteMany({
       where: {
         email: { contains: '@e2e.com' },
       },
     });
+  });
 
+  test.afterAll(async () => {
     await prisma.$disconnect();
   });
 
