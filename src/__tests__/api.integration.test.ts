@@ -22,6 +22,27 @@ const { prisma } = await import('../db/client.js');
 const { redis } = await import('../queue/redis.js');
 const { emailQueue } = await import('../queue/email.queue.js');
 
+async function seedSubscription(
+  email: string,
+  repoName: string,
+  status: 'PENDING' | 'ACTIVE' | 'UNSUBSCRIBED',
+  lastSeenTag?: string,
+) {
+  const repo = await prisma.repository.upsert({
+    where: { name: repoName },
+    update: { lastSeenTag },
+    create: { name: repoName, lastSeenTag },
+  });
+
+  return prisma.subscription.create({
+    data: {
+      email,
+      repositoryId: repo.id,
+      status,
+    },
+  });
+}
+
 describe('Integration Tests: API Endpoints', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -96,16 +117,8 @@ describe('Integration Tests: API Endpoints', () => {
 
     it('returns 409 if subscription is already PENDING', async () => {
       mockCheckRepoExists.mockResolvedValue(undefined);
-      const repo = await prisma.repository.create({
-        data: { name: 'test/repo' },
-      });
-      await prisma.subscription.create({
-        data: {
-          email: 'test@example.com',
-          repositoryId: repo.id,
-          status: 'PENDING',
-        },
-      });
+
+      await seedSubscription('test@example.com', 'test/repo', 'PENDING');
 
       const res = await request(app)
         .post('/api/subscribe')
@@ -117,16 +130,8 @@ describe('Integration Tests: API Endpoints', () => {
 
     it('returns 409 if subscription is already ACTIVE', async () => {
       mockCheckRepoExists.mockResolvedValue(undefined);
-      const repo = await prisma.repository.create({
-        data: { name: 'test/repo' },
-      });
-      await prisma.subscription.create({
-        data: {
-          email: 'test@example.com',
-          repositoryId: repo.id,
-          status: 'ACTIVE',
-        },
-      });
+
+      await seedSubscription('test@example.com', 'test/repo', 'ACTIVE');
 
       const res = await request(app)
         .post('/api/subscribe')
@@ -138,16 +143,12 @@ describe('Integration Tests: API Endpoints', () => {
 
     it('returns 200, updates status to PENDING and resends email if UNSUBSCRIBED', async () => {
       mockCheckRepoExists.mockResolvedValue(undefined);
-      const repo = await prisma.repository.create({
-        data: { name: 'test/repo' },
-      });
-      const sub = await prisma.subscription.create({
-        data: {
-          email: 'test@example.com',
-          repositoryId: repo.id,
-          status: 'UNSUBSCRIBED',
-        },
-      });
+
+      const sub = await seedSubscription(
+        'test@example.com',
+        'test/repo',
+        'UNSUBSCRIBED',
+      );
 
       const res = await request(app)
         .post('/api/subscribe')
@@ -172,16 +173,11 @@ describe('Integration Tests: API Endpoints', () => {
 
   describe('GET /api/confirm/:token', () => {
     it('returns 200 and changes status to ACTIVE for a valid token', async () => {
-      const repo = await prisma.repository.create({
-        data: { name: 'test/confirm-repo' },
-      });
-      const sub = await prisma.subscription.create({
-        data: {
-          email: 'confirm@test.com',
-          repositoryId: repo.id,
-          status: 'PENDING',
-        },
-      });
+      const sub = await seedSubscription(
+        'confirm@test.com',
+        'test/confirm-repo',
+        'PENDING',
+      );
 
       const res = await request(app).get(`/api/confirm/${sub.confirmToken}`);
 
@@ -199,16 +195,11 @@ describe('Integration Tests: API Endpoints', () => {
     });
 
     it('returns 400 if subscription is already ACTIVE', async () => {
-      const repo = await prisma.repository.create({
-        data: { name: 'test/confirm-repo' },
-      });
-      const sub = await prisma.subscription.create({
-        data: {
-          email: 'confirm@test.com',
-          repositoryId: repo.id,
-          status: 'ACTIVE',
-        },
-      });
+      const sub = await seedSubscription(
+        'confirm@test.com',
+        'test/confirm-repo',
+        'ACTIVE',
+      );
 
       const res = await request(app).get(`/api/confirm/${sub.confirmToken}`);
 
@@ -219,16 +210,11 @@ describe('Integration Tests: API Endpoints', () => {
 
   describe('GET /api/unsubscribe/:token', () => {
     it('returns 200 and changes status to UNSUBSCRIBED for a valid token', async () => {
-      const repo = await prisma.repository.create({
-        data: { name: 'test/unsub-repo' },
-      });
-      const sub = await prisma.subscription.create({
-        data: {
-          email: 'unsub@test.com',
-          repositoryId: repo.id,
-          status: 'ACTIVE',
-        },
-      });
+      const sub = await seedSubscription(
+        'unsub@test.com',
+        'test/unsub-repo',
+        'ACTIVE',
+      );
 
       const res = await request(app).get(
         `/api/unsubscribe/${sub.unsubscribeToken}`,
@@ -248,16 +234,11 @@ describe('Integration Tests: API Endpoints', () => {
     });
 
     it('returns 400 if already UNSUBSCRIBED', async () => {
-      const repo = await prisma.repository.create({
-        data: { name: 'test/unsub-repo' },
-      });
-      const sub = await prisma.subscription.create({
-        data: {
-          email: 'unsub@test.com',
-          repositoryId: repo.id,
-          status: 'UNSUBSCRIBED',
-        },
-      });
+      const sub = await seedSubscription(
+        'unsub@test.com',
+        'test/unsub-repo',
+        'UNSUBSCRIBED',
+      );
 
       const res = await request(app).get(
         `/api/unsubscribe/${sub.unsubscribeToken}`,
@@ -291,19 +272,8 @@ describe('Integration Tests: API Endpoints', () => {
     });
 
     it('returns 200 and a list of ACTIVE subscriptions for the email', async () => {
-      const repo1 = await prisma.repository.create({
-        data: { name: 'active/repo', lastSeenTag: 'v1.0' },
-      });
-      const repo2 = await prisma.repository.create({
-        data: { name: 'pending/repo' },
-      });
-
-      await prisma.subscription.createMany({
-        data: [
-          { email: 'list@test.com', repositoryId: repo1.id, status: 'ACTIVE' },
-          { email: 'list@test.com', repositoryId: repo2.id, status: 'PENDING' },
-        ],
-      });
+      await seedSubscription('list@test.com', 'active/repo', 'ACTIVE', 'v1.0');
+      await seedSubscription('list@test.com', 'pending/repo', 'PENDING');
 
       const res = await request(app)
         .get('/api/subscriptions?email=list@test.com')
