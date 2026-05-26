@@ -22,6 +22,22 @@ const { prisma } = await import('../db/client.js');
 const { redis } = await import('../queue/redis.js');
 const { emailQueue } = await import('../queue/email.queue.js');
 
+const TEST_EMAILS = [
+  'test@example.com',
+  'confirm@test.com',
+  'unsub@test.com',
+  'list@test.com',
+];
+
+const TEST_REPOS = [
+  'golang/go',
+  'test/repo',
+  'test/confirm-repo',
+  'test/unsub-repo',
+  'active/repo',
+  'pending/repo',
+];
+
 async function seedSubscription(
   email: string,
   repoName: string,
@@ -46,8 +62,13 @@ async function seedSubscription(
 describe('Integration Tests: API Endpoints', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
-    await prisma.subscription.deleteMany();
-    await prisma.repository.deleteMany();
+
+    await prisma.subscription.deleteMany({
+      where: { email: { in: TEST_EMAILS } },
+    });
+    await prisma.repository.deleteMany({
+      where: { name: { in: TEST_REPOS } },
+    });
   });
 
   afterAll(async () => {
