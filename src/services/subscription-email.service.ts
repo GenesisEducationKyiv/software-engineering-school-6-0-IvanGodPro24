@@ -2,59 +2,64 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import handlebars from 'handlebars';
 import { getEnvVar } from '../utils/getEnvVar.js';
-import { sendEmail } from './email.service.js';
+import { IEmailProvider } from './email.service.js';
+import { ISubscriptionEmailService } from './subscription.service.js';
 
-const compileTemplate = async (
-  templateName: string,
-  data: Record<string, unknown>,
-) => {
-  const templatePath = path.join(
-    process.cwd(),
-    'src',
-    'templates',
-    `${templateName}.hbs`,
-  );
+export class SubscriptionEmailService implements ISubscriptionEmailService {
+  constructor(
+    private readonly emailProvider: IEmailProvider,
+    private readonly templateDir: string,
+  ) {}
 
-  const templateSource = await fs.readFile(templatePath, 'utf-8');
+  private async compileTemplate(
+    templateName: string,
+    data: Record<string, unknown>,
+  ) {
+    const templatePath = path.join(this.templateDir, `${templateName}.hbs`);
 
-  const template = handlebars.compile(templateSource);
-  return template(data);
-};
+    const templateSource = await fs.readFile(templatePath, 'utf-8');
+    const template = handlebars.compile(templateSource);
+    return template(data);
+  }
 
-export const sendConfirmEmail = async (
-  email: string,
-  repoName: string,
-  token: string,
-) => {
-  const confirmUrl = `${getEnvVar('APP_URL')}/api/confirm/${token}`;
+  async sendConfirmEmail(
+    email: string,
+    repoName: string,
+    token: string,
+  ): Promise<void> {
+    const confirmUrl = `${getEnvVar('APP_URL')}/api/confirm/${token}`;
+    const html = await this.compileTemplate('confirm-subscription', {
+      repoName,
+      confirmUrl,
+    });
 
-  const html = await compileTemplate('confirm-subscription', {
-    repoName,
-    confirmUrl,
-  });
+    await this.emailProvider.sendEmail(
+      email,
+      `Action required: Confirm your subscription to ${repoName}`,
+      html,
+    );
+  }
 
-  await sendEmail(
-    email,
-    `Action required: Confirm your subscription to ${repoName}`,
-    html,
-  );
-};
+  async sendNewReleaseEmail(
+    email: string,
+    repoName: string,
+    tag: string,
+    unsubscribeToken: string,
+  ): Promise<void> {
+    const unsubscribeUrl = `${getEnvVar('APP_URL')}/api/unsubscribe/${unsubscribeToken}`;
+    const releaseUrl = `https://github.com/${repoName}/releases/tag/${tag}`;
 
-export const sendNewReleaseEmail = async (
-  email: string,
-  repoName: string,
-  tag: string,
-  unsubscribeToken: string,
-) => {
-  const unsubscribeUrl = `${getEnvVar('APP_URL')}/api/unsubscribe/${unsubscribeToken}`;
-  const releaseUrl = `https://github.com/${repoName}/releases/tag/${tag}`;
+    const html = await this.compileTemplate('new-release', {
+      repoName,
+      tag,
+      releaseUrl,
+      unsubscribeUrl,
+    });
 
-  const html = await compileTemplate('new-release', {
-    repoName,
-    tag,
-    releaseUrl,
-    unsubscribeUrl,
-  });
-
-  await sendEmail(email, `New release available: ${repoName} ${tag}`, html);
-};
+    await this.emailProvider.sendEmail(
+      email,
+      `New release available: ${repoName} ${tag}`,
+      html,
+    );
+  }
+}

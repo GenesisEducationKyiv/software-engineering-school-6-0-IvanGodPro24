@@ -1,19 +1,30 @@
-import { redis } from '../queue/redis.js';
+import { Redis } from 'ioredis';
+import { ILogger } from '../utils/logger.js';
 
-const TTL = 60 * 10;
+export interface ICacheService {
+  get<T>(key: string): Promise<T | null>;
+  set(key: string, value: unknown, ttl?: number): Promise<void>;
+}
 
-export const getCache = async <T>(key: string): Promise<T | null> => {
-  const data = await redis.get(key);
+export class RedisCacheService implements ICacheService {
+  constructor(
+    private readonly redis: Redis,
+    private readonly logger: ILogger,
+    private readonly ttl = 600,
+  ) {}
 
-  if (!data) {
-    console.log(`[Cache] MISS: ${key}`);
-    return null;
+  async get<T>(key: string): Promise<T | null> {
+    const data = await this.redis.get(key);
+
+    if (!data) {
+      this.logger.debug(`MISS: ${key}`);
+      return null;
+    }
+    this.logger.debug(`HIT: ${key}`);
+    return JSON.parse(data);
   }
 
-  console.log(`[Cache] HIT: ${key}`);
-  return JSON.parse(data);
-};
-
-export const setCache = async (key: string, value: unknown) => {
-  await redis.set(key, JSON.stringify(value), 'EX', TTL);
-};
+  async set(key: string, value: unknown, ttl = this.ttl): Promise<void> {
+    await this.redis.set(key, JSON.stringify(value), 'EX', ttl);
+  }
+}

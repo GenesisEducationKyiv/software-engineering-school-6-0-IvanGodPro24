@@ -15,14 +15,53 @@ const mockPrisma = {
 };
 
 jest.unstable_mockModule('../db/client.js', () => ({ prisma: mockPrisma }));
+jest.unstable_mockModule('ioredis', () => {
+  class RedisMock {
+    on = jest.fn();
+    connect = jest.fn();
+    disconnect = jest.fn();
+    quit = jest.fn();
+  }
+
+  return {
+    default: RedisMock,
+    Redis: RedisMock,
+  };
+});
+jest.unstable_mockModule('bullmq', () => ({
+  Queue: class QueueMock {
+    on = jest.fn();
+    add = jest.fn();
+    addBulk = jest.fn();
+    close = jest.fn();
+  },
+  Worker: class WorkerMock {
+    on = jest.fn();
+    close = jest.fn();
+  },
+}));
 jest.unstable_mockModule('../services/github.service.js', () => ({
-  checkRepoExists: mockCheckRepoExists,
+  GitHubClient: class {
+    checkRepoExists = mockCheckRepoExists;
+    getLatestRelease = jest.fn();
+  },
+}));
+
+jest.unstable_mockModule('../services/email.service.js', () => ({
+  NodemailerProvider: class {
+    sendEmail = jest.fn();
+  },
 }));
 jest.unstable_mockModule('../services/subscription-email.service.js', () => ({
-  sendConfirmEmail: jest.fn(),
+  SubscriptionEmailService: class {
+    sendConfirmEmail = jest.fn();
+    sendNewReleaseEmail = jest.fn();
+  },
 }));
 jest.unstable_mockModule('../services/scanner.service.js', () => ({
-  startScanner: jest.fn(),
+  ScannerService: class {
+    startScanner = jest.fn();
+  },
 }));
 jest.unstable_mockModule('../queue/dashboard.js', () => ({
   bullBoardRouter: (req: unknown, res: unknown, next: () => void) => next(),

@@ -1,133 +1,158 @@
 import createHttpError from 'http-errors';
 import { randomUUID } from 'node:crypto';
-import { Prisma } from '@prisma/client';
-import { prisma } from '../db/client.js';
-import { sendConfirmEmail } from './subscription-email.service.js';
+import { UniqueConstraintError } from '../domain/errors.js';
+import { SubscriptionEntity } from '../domain/subscription.entity.js';
 
-export const createSubscription = async (email: string, repo: string) => {
-  const repository = await prisma.repository.upsert({
-    where: { name: repo },
-    update: {},
-    create: { name: repo },
-  });
+import { ITrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
+import { ISubscriptionRepository } from '../repositories/subscription.repository.js';
+import { ISubscriptionQueryRepository } from '../repositories/subscription-query.repository.js';
+import { IGitHubClient } from './github.service.js';
+import { GithubRepoId } from '../domain/github-repo-id.js';
 
-  let existing = await prisma.subscription.findUnique({
-    where: {
-      email_repositoryId: {
-        email,
-        repositoryId: repository.id,
-      },
-    },
-  });
+export interface ISubscriptionEmailService {
+  sendConfirmEmail(
+    email: string,
+    repoName: string,
+    token: string,
+  ): Promise<void>;
+  sendNewReleaseEmail(
+    email: string,
+    repoName: string,
+    tag: string,
+    unsubscribeToken: string,
+  ): Promise<void>;
+}
 
-  if (existing) {
-    if (existing.status === 'ACTIVE') {
-      throw createHttpError(409, 'Already subscribed to this repository');
-    }
+export class SubscriptionService {
+  constructor(
+    private readonly repoRepository: ITrackedRepoRepository,
+    private readonly subscriptionRepository: ISubscriptionRepository,
+    private readonly subscriptionQueryRepository: ISubscriptionQueryRepository,
+    private readonly emailService: ISubscriptionEmailService,
+    private readonly githubClient: IGitHubClient,
+  ) {}
 
-    if (existing.status === 'PENDING') {
-      throw createHttpError(
-        409,
-        'Subscription is pending. Please check your email.',
-      );
-    }
+  async createSubscription(email: string, repo: string) {
+    const repoId = new GithubRepoId(repo);
 
-    if (existing.status === 'UNSUBSCRIBED') {
-      existing = await prisma.subscription.update({
-        where: { id: existing.id },
-        data: {
-          status: 'PENDING',
-          confirmToken: randomUUID(),
-        },
-      });
+    await this.githubClient.checkRepoExists(repoId.owner, repoId.name);
 
-      await sendConfirmEmail(
-        existing.email,
-        repository.name,
-        existing.confirmToken,
-      );
+    const repository = await this.repoRepository.upsert(repoId.fullName);
 
-      return existing;
-    }
-  }
-
-  try {
-    const subscription = await prisma.subscription.create({
-      data: {
-        email,
-        repositoryId: repository.id,
-      },
-    });
-
-    await sendConfirmEmail(
-      subscription.email,
-      repository.name,
-      subscription.confirmToken,
+    const existing = await this.subscriptionRepository.findByEmailAndRepoId(
+      email,
+      repository.id,
     );
 
-    return subscription;
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === 'P2002'
-    ) {
-      throw createHttpError(
-        409,
-        'Subscription is processing or already exists.',
-      );
+    if (existing) {
+      return this.handleExistingSubscription(existing, repository.name);
     }
 
-    throw error;
+    return this.createNewSubscription(email, repository);
   }
-};
 
-export const confirmSubscription = async (token: string) => {
-  const subscription = await prisma.subscription.findUnique({
-    where: { confirmToken: token },
-  });
+  private async handleExistingSubscription(
+    existing: SubscriptionEntity,
+    repoName: string,
+  ) {
+    switch (existing.status) {
+      case 'ACTIVE':
+        throw createHttpError(409, 'Already subscribed to this repository');
 
-  if (!subscription) throw createHttpError(404, 'Token not found');
+      case 'PENDING':
+        throw createHttpError(
+          409,
+          'Subscription is pending. Please check your email.',
+        );
 
-  if (subscription.status === 'ACTIVE')
-    throw createHttpError(400, 'Subscription already confirmed');
+      case 'UNSUBSCRIBED': {
+        const updated = await this.subscriptionRepository.updateStatus(
+          existing.id,
+          'PENDING',
+          { confirmToken: randomUUID() },
+        );
 
-  await prisma.subscription.update({
-    where: { id: subscription.id },
-    data: { status: 'ACTIVE' },
-  });
-};
+        await this.emailService.sendConfirmEmail(
+          updated.email,
+          repoName,
+          updated.confirmToken,
+        );
 
-export const cancelSubscription = async (token: string) => {
-  const subscription = await prisma.subscription.findUnique({
-    where: { unsubscribeToken: token },
-  });
+        return updated;
+      }
 
-  if (!subscription) throw createHttpError(404, 'Token not found');
+      default:
+        throw createHttpError(409, 'Subscription already exists.');
+    }
+  }
 
-  if (subscription.status === 'UNSUBSCRIBED')
-    throw createHttpError(400, 'Already unsubscribed');
+  private async createNewSubscription(
+    email: string,
+    repository: { id: string; name: string },
+  ) {
+    try {
+      const subscription = await this.subscriptionRepository.create(
+        email,
+        repository.id,
+      );
 
-  await prisma.subscription.update({
-    where: { id: subscription.id },
-    data: { status: 'UNSUBSCRIBED' },
-  });
-};
+      await this.emailService.sendConfirmEmail(
+        subscription.email,
+        repository.name,
+        subscription.confirmToken,
+      );
 
-export const getSubscriptionsByEmail = async (email: string) => {
-  const subscriptions = await prisma.subscription.findMany({
-    where: {
+      return subscription;
+    } catch (error) {
+      if (error instanceof UniqueConstraintError) {
+        throw createHttpError(
+          409,
+          'Subscription is processing or already exists.',
+        );
+      }
+      throw error;
+    }
+  }
+
+  async confirmSubscription(token: string) {
+    const subscription =
+      await this.subscriptionRepository.findByConfirmToken(token);
+
+    if (!subscription) throw createHttpError(404, 'Token not found');
+
+    if (subscription.status === 'ACTIVE')
+      throw createHttpError(400, 'Subscription already confirmed');
+
+    await this.subscriptionRepository.updateStatus(subscription.id, 'ACTIVE');
+  }
+
+  async cancelSubscription(token: string) {
+    const subscription =
+      await this.subscriptionRepository.findByUnsubscribeToken(token);
+
+    if (!subscription) throw createHttpError(404, 'Token not found');
+
+    if (subscription.status === 'UNSUBSCRIBED')
+      throw createHttpError(400, 'Already unsubscribed');
+
+    await this.subscriptionRepository.updateStatus(
+      subscription.id,
+      'UNSUBSCRIBED',
+    );
+  }
+
+  async getSubscriptionsByEmail(email: string) {
+    const subscriptions =
+      await this.subscriptionQueryRepository.findByEmailAndStatusWithRepo(
+        email,
+        'ACTIVE',
+      );
+
+    return subscriptions.map(({ email, repository, status }) => ({
       email,
-      status: 'ACTIVE',
-    },
-    include: {
-      repository: true,
-    },
-  });
-
-  return subscriptions.map(({ email, repository, status }) => ({
-    email,
-    repo: repository.name,
-    confirmed: status === 'ACTIVE',
-    last_seen_tag: repository.lastSeenTag,
-  }));
-};
+      repo: repository.name,
+      confirmed: status === 'ACTIVE',
+      last_seen_tag: repository.lastSeenTag,
+    }));
+  }
+}
