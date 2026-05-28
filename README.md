@@ -42,18 +42,21 @@ A robust, production-ready REST API that allows users to subscribe to email noti
 The fastest way to get the project running locally:
 
 **1. Clone the repository:**
+
 ```bash
 git clone https://github.com/GenesisEducationKyiv/software-engineering-school-6-0-IvanGodPro24.git
 cd software-engineering-school-6-0-IvanGodPro24
 ```
 
 **2. Set up environment variables:**
+
 ```bash
 cp .env.example .env
 # Edit .env with your values (see "Environment Configuration" below)
 ```
 
 **3. Start with Docker:**
+
 ```bash
 docker compose up -d --build
 ```
@@ -165,7 +168,7 @@ npm test
 
 ## 🗂 Main Project Structure
 
-```
+```bash
 src/
 ├── controllers/        # Express route handlers
 ├── db/                 # Prisma client singleton
