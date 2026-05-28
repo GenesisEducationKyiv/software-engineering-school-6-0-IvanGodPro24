@@ -44,7 +44,7 @@
     "express": "^5.2.1",
     "handlebars": "^4.7.9",
     "http-errors": "^2.0.1",
-    "ioredis": "^5.10.1",
+    "ioredis": "5.10.1",
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.5",
     "pg": "^8.20.0",
