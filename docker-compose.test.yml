@@ -1,0 +1,22 @@
+services:
+  test_db:
+    image: postgres:15-alpine
+    container_name: github_notifier_test_db
+    environment:
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: test_db
+    ports:
+      - '5434:5432'
+
+  test_redis:
+    image: redis:7-alpine
+    container_name: github_notifier_test_redis
+    ports:
+      - '6380:6379'
+  test_smtp:
+    image: mailhog/mailhog
+    platform: linux/amd64
+    container_name: github_notifier_test_smtp
+    ports:
+      - '1025:1025'

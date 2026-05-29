@@ -2,7 +2,6 @@ import createHttpError from 'http-errors';
 import { randomUUID } from 'node:crypto';
 import { UniqueConstraintError } from '../domain/errors.js';
 import { SubscriptionEntity } from '../domain/subscription.entity.js';
-
 import { ITrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
 import { ISubscriptionRepository } from '../repositories/subscription.repository.js';
 import { ISubscriptionQueryRepository } from '../repositories/subscription-query.repository.js';

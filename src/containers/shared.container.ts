@@ -22,7 +22,7 @@ const cacheLogger = new PinoLogger('Cache');
 
 export const cacheService = new RedisCacheService(redis, cacheLogger);
 
-const githubToken = getEnvVar('GITHUB_TOKEN', '');
+const githubToken = getEnvVar('GH_TOKEN', '');
 
 const githubApi = axios.create({
   baseURL: 'https://api.github.com',
@@ -30,6 +30,7 @@ const githubApi = axios.create({
     Accept: 'application/vnd.github.v3+json',
     ...(githubToken && { Authorization: `Bearer ${githubToken}` }),
   },
+  validateStatus: (status) => status === 200 || status === 304,
 });
 
 export const githubClient = new GitHubClient(cacheService, githubApi);

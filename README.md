@@ -31,7 +31,7 @@ A robust, production-ready REST API that allows users to subscribe to email noti
 | Database | PostgreSQL, Prisma ORM |
 | Caching & Queues | Redis, BullMQ, ioredis |
 | Mailing | Nodemailer, Handlebars (HTML templates) |
-| Testing | Jest, ts-jest |
+| Testing | Jest, ts-jest, Supertest, Playwright |
 | Observability | Prometheus (`prom-client`), Grafana |
 | Containerization | Docker, Docker Compose |
 
@@ -89,7 +89,7 @@ APP_URL=http://localhost:3000
 API_KEY=your_super_secret_api_key
 
 # External APIs
-GITHUB_TOKEN=your_github_personal_access_token
+GH_TOKEN=your_github_personal_access_token
 
 # SMTP Configuration (see "Choosing an SMTP Service" below)
 SMTP_FROM=your_email@gmail.com
@@ -157,12 +157,18 @@ In Grafana, add `http://prometheus:9090` as a Prometheus data source to visualiz
 
 ## 🧪 Testing
 
-Unit tests cover all core business logic (subscription service, GitHub service) using Jest with mocked database and external API calls.
+The test suite is split into unit, integration, and Playwright E2E layers.
 
-```bash
-npm install
-npm test
-```
+| Command | Description |
+|---|---|
+| `npm run test:unit` | Runs isolated Jest tests. |
+| `npm run test:integration` | Runs API integration tests with test PostgreSQL and Redis containers. |
+| `npm run test:e2e` | Runs Playwright browser tests against the built app. |
+| `npm test` | Runs the full test suite in sequence. |
+
+Integration and E2E commands start and clean up their own Docker test infrastructure from `docker-compose.test.yml`. CI runs lint/build, unit, integration, and E2E checks as separate jobs before deployment.
+
+For the full local workflow, required tools, ports, helper scripts, and report handling, see [testing.md](testing.md).
 
 ---
 
@@ -180,6 +186,9 @@ src/
 ├── utils/              # Shared utilities (getEnvVar)
 ├── validation/         # Zod schemas
 └── index.ts            # App entry point
+public/                 # Static subscription page used by the app and E2E tests
+e2e/                    # Playwright end-to-end tests
+scripts/                # Test runner helper scripts
 prisma/
 ├── schema.prisma
 └── migrations/

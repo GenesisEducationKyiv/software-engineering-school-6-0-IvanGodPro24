@@ -16,5 +16,15 @@ export default defineConfig([
       ],
     },
   },
+  {
+    files: ['public/**/*.js'],
+    languageOptions: {
+      globals: {
+        document: 'readonly',
+        fetch: 'readonly',
+        window: 'readonly',
+      },
+    },
+  },
   eslintConfigPrettier,
 ]);
