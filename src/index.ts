@@ -6,7 +6,7 @@ import { getEnvVar } from './utils/getEnvVar.js';
 import { notFoundHandler } from './middleware/notFoundHandler.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import rootRouter from './routes/index.js';
-import { scannerService } from './container.js';
+import { scannerService } from './containers/scanner.container.js';
 import { bullBoardRouter } from './queue/dashboard.js';
 import { swaggerDocs } from './middleware/swaggerDocs.js';
 import { PinoLogger } from './utils/logger.js';
@@ -30,10 +30,6 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 if (process.env.NODE_ENV !== 'test') {
-  import('./queue/email.worker.js').catch((err) =>
-    logger.error(`Worker failed to load: ${err}`),
-  );
-
   logger.info('Scanner initialized');
   cron.schedule('*/10 * * * *', scannerService.scanRepositories);
 

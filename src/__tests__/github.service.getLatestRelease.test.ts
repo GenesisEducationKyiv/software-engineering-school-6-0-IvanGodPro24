@@ -1,37 +1,37 @@
 import { jest } from '@jest/globals';
 import { ICacheService } from '../services/cache.service.js';
-
-const mockGet = jest.fn<(...args: unknown[]) => Promise<unknown>>();
-
-jest.unstable_mockModule('axios', () => ({
-  default: {
-    create: jest.fn(() => ({ get: mockGet })),
-    isAxiosError: jest.fn(),
-  },
-  isAxiosError: jest.fn(),
-}));
-
-const { default: axios } = await import('axios');
-const { GitHubClient } = await import('../services/github.service.js');
-
-const asMock = (fn: unknown) => fn as ReturnType<typeof jest.fn>;
+import { GitHubClient } from '../services/github.service.js';
+import { AxiosInstance } from 'axios';
 
 describe('github.service - getLatestRelease', () => {
-  let githubClient: InstanceType<typeof GitHubClient>;
+  let githubClient: GitHubClient;
 
   const mockCacheService = {
     get: jest.fn(),
     set: jest.fn(),
   } as unknown as jest.Mocked<ICacheService>;
 
+  const mockAxiosGet = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+
+  const mockAxiosInstance = {
+    get: mockAxiosGet,
+  } as unknown as AxiosInstance;
+
+  const createAxiosError = (
+    status: number,
+    headers: Record<string, string> = {},
+  ) => ({
+    isAxiosError: true,
+    response: { status, headers },
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGet.mockReset();
 
     mockCacheService.get.mockResolvedValue(null);
     mockCacheService.set.mockResolvedValue(undefined);
 
-    githubClient = new GitHubClient(mockCacheService);
+    githubClient = new GitHubClient(mockCacheService, mockAxiosInstance);
   });
 
   it('returns tag_name from cache when GitHub API returns 304', async () => {
@@ -43,21 +43,24 @@ describe('github.service - getLatestRelease', () => {
       },
     );
 
-    mockGet.mockResolvedValue({ status: 304 });
+    mockAxiosGet.mockResolvedValue({ status: 304 });
 
     const tag = await githubClient.getLatestRelease('golang', 'go');
 
     expect(tag).toBe('v1.20.0');
-    expect(mockGet).toHaveBeenCalledWith('/repos/golang/go/releases/latest', {
-      headers: { 'If-None-Match': 'W/"test-etag"' },
-    });
+    expect(mockAxiosGet).toHaveBeenCalledWith(
+      '/repos/golang/go/releases/latest',
+      {
+        headers: { 'If-None-Match': 'W/"test-etag"' },
+      },
+    );
     expect(mockCacheService.set).not.toHaveBeenCalled();
   });
 
   it('returns tag_name from API and caches both tag and etag if repo updated', async () => {
     mockCacheService.get.mockResolvedValue(null);
 
-    mockGet.mockResolvedValue({
+    mockAxiosGet.mockResolvedValue({
       status: 200,
       data: { tag_name: 'v1.22.0' },
       headers: { etag: 'W/"new-etag"' },
@@ -80,8 +83,7 @@ describe('github.service - getLatestRelease', () => {
   it('returns null if repository has no releases (404) and caches null', async () => {
     mockCacheService.get.mockResolvedValue(null);
 
-    mockGet.mockRejectedValue({ response: { status: 404 } });
-    asMock(axios.isAxiosError).mockReturnValue(true);
+    mockAxiosGet.mockRejectedValue(createAxiosError(404));
 
     const tag = await githubClient.getLatestRelease('golang', 'go');
 

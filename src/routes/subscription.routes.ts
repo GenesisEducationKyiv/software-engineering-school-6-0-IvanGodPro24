@@ -1,5 +1,5 @@
 import { Router, json } from 'express';
-import { subscriptionController } from '../container.js';
+import { subscriptionController } from '../containers/subscription.container.js';
 import { validate } from '../middleware/validate.js';
 import {
   subscribeSchema,

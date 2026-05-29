@@ -1,5 +1,8 @@
 import { jest } from '@jest/globals';
-import { Prisma, Repository, Subscription } from '@prisma/client';
+import {
+  SubscriptionEntity,
+  TrackedRepoEntity,
+} from '../domain/subscription.entity.js';
 import {
   ISubscriptionEmailService,
   SubscriptionService,
@@ -7,6 +10,8 @@ import {
 import { TrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
 import { SubscriptionRepository } from '../repositories/subscription.repository.js';
 import { IGitHubClient } from '../services/github.service.js';
+import { SubscriptionQueryRepository } from '../repositories/subscription-query.repository.js';
+import { UniqueConstraintError } from '../domain/errors.js';
 
 const mockRepoRepository = {
   upsert: jest.fn(),
@@ -25,11 +30,18 @@ const mockSubscriptionRepository = {
   findByUnsubscribeToken: jest.fn(),
   create: jest.fn(),
   updateStatus: jest.fn(),
-  findActiveByEmailWithRepo: jest.fn(),
+  findByEmailAndStatusWithRepo: jest.fn(),
+  findByRepoIdAndStatus: jest.fn(),
 } as unknown as jest.Mocked<SubscriptionRepository>;
+
+const mockSubscriptionQueryRepository = {
+  findByEmailAndStatusWithRepo: jest.fn(),
+  findByRepoIdAndStatus: jest.fn(),
+} as unknown as jest.Mocked<SubscriptionQueryRepository>;
 
 const mockEmailService = {
   sendConfirmEmail: jest.fn(),
+  sendNewReleaseEmail: jest.fn(),
 } as jest.Mocked<ISubscriptionEmailService>;
 
 describe('subscription.service', () => {
@@ -41,6 +53,7 @@ describe('subscription.service', () => {
     subscriptionService = new SubscriptionService(
       mockRepoRepository,
       mockSubscriptionRepository,
+      mockSubscriptionQueryRepository,
       mockEmailService,
       mockGithubClient,
     );
@@ -58,12 +71,10 @@ describe('subscription.service', () => {
 
       mockGithubClient.checkRepoExists.mockResolvedValue();
 
-      mockRepoRepository.upsert.mockResolvedValue(
-        repo as Repository,
-      );
+      mockRepoRepository.upsert.mockResolvedValue(repo as TrackedRepoEntity);
       mockSubscriptionRepository.findByEmailAndRepoId.mockResolvedValue(null);
       mockSubscriptionRepository.create.mockResolvedValue(
-        subscription as Subscription,
+        subscription as SubscriptionEntity,
       );
 
       await subscriptionService.createSubscription(
@@ -91,12 +102,12 @@ describe('subscription.service', () => {
       mockRepoRepository.upsert.mockResolvedValue({
         id: 'repo-1',
         name: 'golang/go',
-      } as Repository);
+      } as TrackedRepoEntity);
 
       mockSubscriptionRepository.findByEmailAndRepoId.mockResolvedValue({
         id: 'sub-1',
         status: 'PENDING',
-      } as Subscription);
+      } as SubscriptionEntity);
 
       await expect(
         subscriptionService.createSubscription('test@test.com', 'golang/go'),
@@ -104,19 +115,17 @@ describe('subscription.service', () => {
     });
   });
 
-  it('throws 409 if Prisma throws P2002 (race condition during create)', async () => {
+  it('throws 409 if repository throws UniqueConstraintError (race condition during create)', async () => {
     mockGithubClient.checkRepoExists.mockResolvedValue();
     mockRepoRepository.upsert.mockResolvedValue({
       id: 'repo-1',
       name: 'golang/go',
-    } as Repository);
+    } as TrackedRepoEntity);
     mockSubscriptionRepository.findByEmailAndRepoId.mockResolvedValue(null);
 
-    const prismaError = new Prisma.PrismaClientKnownRequestError(
-      'Unique constraint failed',
-      { code: 'P2002', clientVersion: '5' },
+    mockSubscriptionRepository.create.mockRejectedValue(
+      new UniqueConstraintError('Subscription already exists'),
     );
-    mockSubscriptionRepository.create.mockRejectedValue(prismaError);
 
     await expect(
       subscriptionService.createSubscription('test@test.com', 'golang/go'),
@@ -127,11 +136,11 @@ describe('subscription.service', () => {
     mockRepoRepository.upsert.mockResolvedValue({
       id: 'repo-1',
       name: 'golang/go',
-    } as Repository);
+    } as TrackedRepoEntity);
     mockSubscriptionRepository.findByEmailAndRepoId.mockResolvedValue({
       id: 'sub-1',
       status: 'PENDING',
-    } as Subscription);
+    } as SubscriptionEntity);
 
     await expect(
       subscriptionService.createSubscription('test@test.com', 'golang/go'),
@@ -142,11 +151,11 @@ describe('subscription.service', () => {
     mockRepoRepository.upsert.mockResolvedValue({
       id: 'repo-1',
       name: 'golang/go',
-    } as Repository);
+    } as TrackedRepoEntity);
     mockSubscriptionRepository.findByEmailAndRepoId.mockResolvedValue({
       id: 'sub-1',
       status: 'ACTIVE',
-    } as Subscription);
+    } as SubscriptionEntity);
 
     await expect(
       subscriptionService.createSubscription('test@test.com', 'golang/go'),
@@ -158,20 +167,20 @@ describe('subscription.service', () => {
     mockRepoRepository.upsert.mockResolvedValue({
       id: 'repo-1',
       name: 'golang/go',
-    } as Repository);
+    } as TrackedRepoEntity);
 
     mockSubscriptionRepository.findByEmailAndRepoId.mockResolvedValue({
       id: 'sub-1',
       email: 'test@test.com',
       status: 'UNSUBSCRIBED',
-    } as Subscription);
+    } as SubscriptionEntity);
 
     mockSubscriptionRepository.updateStatus.mockResolvedValue({
       id: 'sub-1',
       email: 'test@test.com',
       status: 'PENDING',
       confirmToken: 'new-token',
-    } as Subscription);
+    } as SubscriptionEntity);
 
     await subscriptionService.createSubscription('test@test.com', 'golang/go');
 
@@ -192,10 +201,10 @@ describe('subscription.service', () => {
       mockSubscriptionRepository.findByConfirmToken.mockResolvedValue({
         id: 'sub-1',
         status: 'PENDING',
-      } as Subscription);
+      } as SubscriptionEntity);
 
       mockSubscriptionRepository.updateStatus.mockResolvedValue(
-        {} as Subscription,
+        {} as SubscriptionEntity,
       );
 
       await subscriptionService.confirmSubscription('token-123');
@@ -220,7 +229,7 @@ describe('subscription.service', () => {
       mockSubscriptionRepository.findByConfirmToken.mockResolvedValue({
         id: 'sub-1',
         status: 'ACTIVE',
-      } as Subscription);
+      } as SubscriptionEntity);
 
       await expect(
         subscriptionService.confirmSubscription('token-123'),
@@ -235,10 +244,10 @@ describe('subscription.service', () => {
       mockSubscriptionRepository.findByUnsubscribeToken.mockResolvedValue({
         id: 'sub-1',
         status: 'ACTIVE',
-      } as Subscription);
+      } as SubscriptionEntity);
 
       mockSubscriptionRepository.updateStatus.mockResolvedValue(
-        {} as Subscription,
+        {} as SubscriptionEntity,
       );
 
       await subscriptionService.cancelSubscription('unsub-token');
@@ -263,7 +272,7 @@ describe('subscription.service', () => {
       mockSubscriptionRepository.findByUnsubscribeToken.mockResolvedValue({
         id: 'sub-1',
         status: 'UNSUBSCRIBED',
-      } as Subscription);
+      } as SubscriptionEntity);
 
       await expect(
         subscriptionService.cancelSubscription('unsub-token'),
@@ -275,13 +284,17 @@ describe('subscription.service', () => {
 
   describe('getSubscriptionsByEmail', () => {
     it('returns subscriptions in the correct format', async () => {
-      mockSubscriptionRepository.findActiveByEmailWithRepo.mockResolvedValue([
-        {
-          email: 'test@test.com',
-          status: 'ACTIVE',
-          repository: { name: 'golang/go', lastSeenTag: 'v1.22.0' },
-        } as Subscription & { repository: Repository },
-      ]);
+      mockSubscriptionQueryRepository.findByEmailAndStatusWithRepo.mockResolvedValue(
+        [
+          {
+            email: 'test@test.com',
+            status: 'ACTIVE',
+            repository: { name: 'golang/go', lastSeenTag: 'v1.22.0' },
+          } as SubscriptionEntity & {
+            repository: TrackedRepoEntity;
+          },
+        ],
+      );
 
       const result =
         await subscriptionService.getSubscriptionsByEmail('test@test.com');
@@ -294,10 +307,14 @@ describe('subscription.service', () => {
           last_seen_tag: 'v1.22.0',
         },
       ]);
+
+      expect(
+        mockSubscriptionQueryRepository.findByEmailAndStatusWithRepo,
+      ).toHaveBeenCalledWith('test@test.com', 'ACTIVE');
     });
 
     it('returns an empty array if no subscriptions found', async () => {
-      mockSubscriptionRepository.findActiveByEmailWithRepo.mockResolvedValue(
+      mockSubscriptionQueryRepository.findByEmailAndStatusWithRepo.mockResolvedValue(
         [],
       );
 

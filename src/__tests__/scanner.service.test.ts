@@ -1,10 +1,13 @@
 import { jest } from '@jest/globals';
 import { ScannerService, IEmailQueue } from '../services/scanner.service.js';
 import { ITrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
-import { ISubscriptionRepository } from '../repositories/subscription.repository.js';
+import { ISubscriptionQueryRepository } from '../repositories/subscription-query.repository.js';
 import { IGitHubClient } from '../services/github.service.js';
 import { ILogger } from '../utils/logger.js';
-import { Repository, Subscription } from '@prisma/client';
+import {
+  SubscriptionEntity,
+  TrackedRepoEntity,
+} from '../domain/subscription.entity.js';
 
 describe('scanner.service', () => {
   let scannerService: ScannerService;
@@ -14,9 +17,10 @@ describe('scanner.service', () => {
     updateLastSeenTag: jest.fn(),
   } as unknown as jest.Mocked<ITrackedRepoRepository>;
 
-  const mockSubscriptionRepository = {
-    findActiveByRepoId: jest.fn(),
-  } as unknown as jest.Mocked<ISubscriptionRepository>;
+  const mockSubscriptionQueryRepository = {
+    findByEmailAndStatusWithRepo: jest.fn(),
+    findByRepoIdAndStatus: jest.fn(),
+  } as unknown as jest.Mocked<ISubscriptionQueryRepository>;
 
   const mockGithubClient = {
     getLatestRelease: jest.fn(),
@@ -37,7 +41,7 @@ describe('scanner.service', () => {
     jest.clearAllMocks();
     scannerService = new ScannerService(
       mockRepoRepository,
-      mockSubscriptionRepository,
+      mockSubscriptionQueryRepository,
       mockGithubClient,
       mockEmailQueue,
       mockLogger,
@@ -55,7 +59,11 @@ describe('scanner.service', () => {
 
   it('updates lastSeenTag but does NOT queue emails if lastSeenTag was null (initial scan)', async () => {
     mockRepoRepository.findWithActiveSubscriptions.mockResolvedValue([
-      { id: 'repo-1', name: 'facebook/react', lastSeenTag: null } as Repository,
+      {
+        id: 'repo-1',
+        name: 'facebook/react',
+        lastSeenTag: null,
+      } as TrackedRepoEntity,
     ]);
     mockGithubClient.getLatestRelease.mockResolvedValue('v18.2.0');
 
@@ -66,7 +74,7 @@ describe('scanner.service', () => {
       'v18.2.0',
     );
     expect(
-      mockSubscriptionRepository.findActiveByRepoId,
+      mockSubscriptionQueryRepository.findByRepoIdAndStatus,
     ).not.toHaveBeenCalled();
     expect(mockEmailQueue.addBulkEmails).not.toHaveBeenCalled();
   });
@@ -77,7 +85,7 @@ describe('scanner.service', () => {
         id: 'repo-1',
         name: 'facebook/react',
         lastSeenTag: 'v18.2.0',
-      } as Repository,
+      } as TrackedRepoEntity,
     ]);
     mockGithubClient.getLatestRelease.mockResolvedValue('v18.2.0');
 
@@ -93,13 +101,19 @@ describe('scanner.service', () => {
         id: 'repo-1',
         name: 'facebook/react',
         lastSeenTag: 'v18.2.0',
-      } as Repository,
+      } as TrackedRepoEntity,
     ]);
     mockGithubClient.getLatestRelease.mockResolvedValue('v19.0.0');
 
-    mockSubscriptionRepository.findActiveByRepoId.mockResolvedValue([
-      { email: 'user1@test.com', unsubscribeToken: 'tkn1' } as Subscription,
-      { email: 'user2@test.com', unsubscribeToken: 'tkn2' } as Subscription,
+    mockSubscriptionQueryRepository.findByRepoIdAndStatus.mockResolvedValue([
+      {
+        email: 'user1@test.com',
+        unsubscribeToken: 'tkn1',
+      } as SubscriptionEntity,
+      {
+        email: 'user2@test.com',
+        unsubscribeToken: 'tkn2',
+      } as SubscriptionEntity,
     ]);
 
     await scannerService.scanRepositories();
@@ -126,16 +140,24 @@ describe('scanner.service', () => {
 
   it('continues scanning other repos if one repo throws an error', async () => {
     mockRepoRepository.findWithActiveSubscriptions.mockResolvedValue([
-      { id: 'repo-1', name: 'bad/repo', lastSeenTag: 'v1.0' } as Repository,
-      { id: 'repo-2', name: 'good/repo', lastSeenTag: 'v1.0' } as Repository,
+      {
+        id: 'repo-1',
+        name: 'bad/repo',
+        lastSeenTag: 'v1.0',
+      } as TrackedRepoEntity,
+      {
+        id: 'repo-2',
+        name: 'good/repo',
+        lastSeenTag: 'v1.0',
+      } as TrackedRepoEntity,
     ]);
 
     mockGithubClient.getLatestRelease
       .mockRejectedValueOnce(new Error('GitHub API Error'))
       .mockResolvedValueOnce('v2.0');
 
-    mockSubscriptionRepository.findActiveByRepoId.mockResolvedValue([
-      { email: 'user@test.com', unsubscribeToken: 'tkn' } as Subscription,
+    mockSubscriptionQueryRepository.findByRepoIdAndStatus.mockResolvedValue([
+      { email: 'user@test.com', unsubscribeToken: 'tkn' } as SubscriptionEntity,
     ]);
 
     await scannerService.scanRepositories();
