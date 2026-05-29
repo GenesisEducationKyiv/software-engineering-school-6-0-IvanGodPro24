@@ -1,15 +1,16 @@
-import { PrismaClient, Repository as DbRepository } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
+import { TrackedRepoEntity } from '../domain/subscription.entity.js';
 
 export interface ITrackedRepoRepository {
-  upsert(name: string): Promise<DbRepository>;
-  findWithActiveSubscriptions(): Promise<DbRepository[]>;
+  upsert(name: string): Promise<TrackedRepoEntity>;
+  findWithActiveSubscriptions(): Promise<TrackedRepoEntity[]>;
   updateLastSeenTag(id: string, tag: string): Promise<void>;
 }
 
 export class TrackedRepoRepository implements ITrackedRepoRepository {
   constructor(private readonly db: PrismaClient) {}
 
-  async upsert(name: string): Promise<DbRepository> {
+  async upsert(name: string): Promise<TrackedRepoEntity> {
     return this.db.repository.upsert({
       where: { name },
       update: {},
@@ -17,7 +18,7 @@ export class TrackedRepoRepository implements ITrackedRepoRepository {
     });
   }
 
-  async findWithActiveSubscriptions(): Promise<DbRepository[]> {
+  async findWithActiveSubscriptions(): Promise<TrackedRepoEntity[]> {
     return this.db.repository.findMany({
       where: {
         subscriptions: { some: { status: 'ACTIVE' } },

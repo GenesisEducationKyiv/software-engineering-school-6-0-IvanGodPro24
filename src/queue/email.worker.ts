@@ -1,7 +1,7 @@
-import { redis } from './redis.js';
 import { Worker, Job } from 'bullmq';
-import { subscriptionEmailService } from '../container.js';
-import { PinoLogger } from '../utils/logger.js';
+import { Redis } from 'ioredis';
+import { ISubscriptionEmailService } from '../services/subscription.service.js';
+import { ILogger } from '../utils/logger.js';
 
 export type EmailJobData = {
   email: string;
@@ -10,29 +10,65 @@ export type EmailJobData = {
   unsubscribeToken: string;
 };
 
-const logger = new PinoLogger('Worker');
+export class EmailWorker {
+  private worker: Worker<EmailJobData> | null = null;
 
-const processEmailJob = async (job: Job<EmailJobData>): Promise<void> => {
-  const { email, repoName, tag, unsubscribeToken } = job.data;
-  logger.info(`Sending email to ${email}`);
+  constructor(
+    private readonly redisConnection: Redis,
+    private readonly emailService: ISubscriptionEmailService,
+    private readonly logger: ILogger,
+  ) {}
 
-  await subscriptionEmailService.sendNewReleaseEmail(
-    email,
-    repoName,
-    tag,
-    unsubscribeToken,
-  );
-};
+  start(): void {
+    if (this.worker) return;
 
-export const emailWorker = new Worker('email-queue', processEmailJob, {
-  connection: redis,
-  concurrency: 5,
-});
+    this.logger.info('Starting Email Worker...');
 
-emailWorker.on('completed', (job) => {
-  logger.info(`Job ${job.id} completed. Email sent to ${job.data.email}`);
-});
+    this.worker = new Worker<EmailJobData>(
+      'email-queue',
+      async (job: Job<EmailJobData>) => this.processJob(job),
+      {
+        connection: this.redisConnection,
+        concurrency: 5,
+      },
+    );
 
-emailWorker.on('failed', (job, err) => {
-  logger.error(`Job ${job?.id} failed for ${job?.data.email}: ${err.message}`);
-});
+    this.setupListeners();
+  }
+
+  async close(): Promise<void> {
+    if (this.worker) {
+      await this.worker.close();
+      this.logger.info('Email Worker gracefully shut down.');
+    }
+  }
+
+  private async processJob(job: Job<EmailJobData>): Promise<void> {
+    const { email, repoName, tag, unsubscribeToken } = job.data;
+
+    this.logger.info(`Processing job ${job.id}: Sending email to ${email}`);
+
+    await this.emailService.sendNewReleaseEmail(
+      email,
+      repoName,
+      tag,
+      unsubscribeToken,
+    );
+  }
+
+  private setupListeners(): void {
+    if (!this.worker) return;
+
+    this.worker.on('completed', (job) => {
+      this.logger.info(
+        `Job ${job.id} completed. Email sent to ${job.data.email}`,
+      );
+    });
+
+    this.worker.on('failed', (job, err) => {
+      this.logger.error(
+        `Job ${job?.id} failed for ${job?.data.email}: ${err.message}`,
+      );
+    });
+  }
+}
