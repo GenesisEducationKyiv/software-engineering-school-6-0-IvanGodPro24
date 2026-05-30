@@ -11,6 +11,8 @@ export const errorHandler = (
   _next: NextFunction,
 ): void => {
   if (err instanceof HttpError) {
+    logger.warn(`Client Error [${err.status}]: ${err.message}`);
+
     res.status(err.status).json({
       status: err.status,
       message: err.name,

@@ -4,6 +4,9 @@ import {
   GetSubscriptionsInput,
 } from '../validation/subscription.schema.js';
 import { SubscriptionService } from '../services/subscription.service.js';
+import { PinoLogger } from '../utils/logger.js';
+
+const logger = new PinoLogger('SubscriptionController');
 
 export class SubscriptionController {
   constructor(private readonly subscriptionService: SubscriptionService) {}
@@ -12,6 +15,8 @@ export class SubscriptionController {
     const { email, repo } = req.body as SubscribeInput;
 
     await this.subscriptionService.createSubscription(email, repo);
+
+    logger.info(`Successfully subscribed [${email}] to [${repo}]`);
 
     res.status(200).json({
       message: 'Subscription created. Please confirm your email.',
