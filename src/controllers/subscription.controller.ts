@@ -16,7 +16,7 @@ export class SubscriptionController {
 
     await this.subscriptionService.createSubscription(email, repo);
 
-    logger.info(`Successfully subscribed [${email}] to [${repo}]`);
+    logger.info({ email, repo }, 'Successfully subscribed user to repository');
 
     res.status(200).json({
       message: 'Subscription created. Please confirm your email.',
