@@ -109,13 +109,13 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "sum(rate(http_request_duration_seconds_count[1m]))",
+          "expr": "sum(rate(http_requests_total[1m]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "sum(rate(http_request_duration_seconds_count[1m]))",
+      "title": "sum(rate(http_requests_total[1m]))",
       "type": "timeseries"
     },
     {
@@ -203,13 +203,13 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(http_request_duration_seconds_count{status_code=~\"4..|5..\"}[1m]))",
+          "expr": "sum(rate(http_requests_total{status_code=~\"4..|5..\"}[1m]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "sum(rate(http_request_duration_seconds_count{status_code=~\"4..|5..\"}[1m]))",
+      "title": "sum(rate(http_requests_total{status_code=~\"4..|5..\"}[1m]))",
       "type": "timeseries"
     },
     {
