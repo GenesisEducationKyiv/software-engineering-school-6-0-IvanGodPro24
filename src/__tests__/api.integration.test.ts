@@ -4,7 +4,7 @@ import request from 'supertest';
 import { randomUUID } from 'node:crypto';
 
 const mockCheckRepoExists = jest.fn<(...args: unknown[]) => Promise<void>>();
-jest.unstable_mockModule('../services/github.service.js', () => ({
+jest.unstable_mockModule('../modules/github/github.service.js', () => ({
   GitHubClient: class {
     checkRepoExists = mockCheckRepoExists;
     getLatestRelease = jest.fn();

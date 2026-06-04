@@ -9,20 +9,6 @@ import { IGitHubClient } from '../github/github.service.js';
 import { GithubRepoId } from '../repositories/github-repo-id.js';
 import { IEmailQueue } from '../scanner/scanner.service.js';
 
-export interface ISubscriptionEmailService {
-  sendConfirmEmail(
-    email: string,
-    repoName: string,
-    token: string,
-  ): Promise<void>;
-  sendNewReleaseEmail(
-    email: string,
-    repoName: string,
-    tag: string,
-    unsubscribeToken: string,
-  ): Promise<void>;
-}
-
 export class SubscriptionService {
   constructor(
     private readonly repoRepository: ITrackedRepoRepository,
