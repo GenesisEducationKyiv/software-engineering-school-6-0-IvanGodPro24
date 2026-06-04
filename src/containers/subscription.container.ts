@@ -4,18 +4,21 @@ import { PinoLogger } from '../infrastructure/logger/logger.js';
 import {
   trackedRepoRepository,
   subscriptionRepository,
-  subscriptionEmailService,
   githubClient,
   subscriptionQueryRepository,
 } from './shared.container.js';
+import { EmailQueueAdapter } from '../queue/email-queue.adapter.js';
+import { emailQueue } from '../queue/email.queue.js';
 
 const controllerLogger = new PinoLogger('SubscriptionController');
+
+const emailQueueAdapter = new EmailQueueAdapter(emailQueue);
 
 export const subscriptionService = new SubscriptionService(
   trackedRepoRepository,
   subscriptionRepository,
   subscriptionQueryRepository,
-  subscriptionEmailService,
+  emailQueueAdapter,
   githubClient,
 );
 

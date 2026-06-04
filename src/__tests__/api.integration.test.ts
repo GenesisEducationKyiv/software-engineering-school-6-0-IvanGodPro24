@@ -11,10 +11,12 @@ jest.unstable_mockModule('../services/github.service.js', () => ({
   },
 }));
 
-const mockSendEmail = jest.fn<(...args: unknown[]) => Promise<void>>();
-jest.unstable_mockModule('../services/email.service.js', () => ({
-  NodemailerProvider: class {
-    sendEmail = mockSendEmail;
+const mockAddEmail = jest.fn<(...args: unknown[]) => Promise<void>>();
+const mockAddBulkEmails = jest.fn<(...args: unknown[]) => Promise<void>>();
+jest.unstable_mockModule('../queue/email-queue.adapter.js', () => ({
+  EmailQueueAdapter: class {
+    addEmail = mockAddEmail;
+    addBulkEmails = mockAddBulkEmails;
   },
 }));
 
@@ -80,11 +82,12 @@ describe('Integration Tests: API Endpoints', () => {
       expect(savedSubscription).not.toBeNull();
       expect(savedSubscription?.status).toBe('PENDING');
 
-      expect(mockSendEmail).toHaveBeenCalledWith(
-        testEmail,
-        expect.stringContaining(testRepo),
-        expect.stringContaining(savedSubscription?.confirmToken || ''),
-      );
+      expect(mockAddEmail).toHaveBeenCalledWith({
+        type: 'confirm-subscription',
+        email: testEmail,
+        repoName: testRepo,
+        confirmToken: savedSubscription?.confirmToken,
+      });
     });
 
     it('returns 400 if email is invalid', async () => {
@@ -178,12 +181,13 @@ describe('Integration Tests: API Endpoints', () => {
       });
       expect(updatedSub?.status).toBe('PENDING');
 
-      expect(mockSendEmail).toHaveBeenCalledTimes(1);
-      expect(mockSendEmail).toHaveBeenCalledWith(
-        testEmail,
-        expect.stringContaining(testRepo),
-        expect.stringContaining(updatedSub?.confirmToken || ''),
-      );
+      expect(mockAddEmail).toHaveBeenCalledTimes(1);
+      expect(mockAddEmail).toHaveBeenCalledWith({
+        type: 'confirm-subscription',
+        email: testEmail,
+        repoName: testRepo,
+        confirmToken: updatedSub?.confirmToken,
+      });
     });
   });
 

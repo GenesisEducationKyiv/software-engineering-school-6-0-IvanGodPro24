@@ -1,4 +1,4 @@
-import path from 'node:path';
+// import path from 'node:path';
 import axios from 'axios';
 import { getEnvVar } from '../shared/getEnvVar.js';
 import { prisma } from '../infrastructure/db/client.js';
@@ -6,8 +6,8 @@ import { redis } from '../infrastructure/redis/redis.js';
 import { RedisCacheService } from '../infrastructure/cache/cache.service.js';
 import { PinoLogger } from '../infrastructure/logger/logger.js';
 import { GitHubClient } from '../modules/github/github.service.js';
-import { NodemailerProvider } from '../services/email.service.js';
-import { SubscriptionEmailService } from '../services/subscription-email.service.js';
+// import { NodemailerProvider } from '../services/email.service.js';
+// import { SubscriptionEmailService } from '../services/subscription-email.service.js';
 import { TrackedRepoRepository } from '../modules/repositories/tracked-repo.repository.js';
 import { SubscriptionRepository } from '../modules/subscriptions/subscription.repository.js';
 import { SubscriptionQueryRepository } from '../modules/subscriptions/subscription-query.repository.js';
@@ -35,10 +35,10 @@ const githubApi = axios.create({
 
 export const githubClient = new GitHubClient(cacheService, githubApi);
 
-export const nodemailerProvider = new NodemailerProvider();
+// export const nodemailerProvider = new NodemailerProvider();
 
-const templateDir = path.join(process.cwd(), 'src', 'templates');
-export const subscriptionEmailService = new SubscriptionEmailService(
-  nodemailerProvider,
-  templateDir,
-);
+// const templateDir = path.join(process.cwd(), 'src', 'templates');
+// export const subscriptionEmailService = new SubscriptionEmailService(
+//   nodemailerProvider,
+//   templateDir,
+// );

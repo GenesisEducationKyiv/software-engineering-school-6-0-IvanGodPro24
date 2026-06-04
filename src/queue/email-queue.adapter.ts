@@ -3,11 +3,18 @@ import { IEmailQueue } from '../modules/scanner/scanner.service.js';
 import { EmailJobData } from '../modules/notifications/email-job.types.js';
 
 export class EmailQueueAdapter implements IEmailQueue {
-  constructor(private readonly queue: Queue) {}
+  constructor(private readonly queue: Queue<EmailJobData>) {}
+
+  async addEmail(jobData: EmailJobData): Promise<void> {
+    await this.queue.add(jobData.type, jobData, {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 5000 },
+    });
+  }
 
   async addBulkEmails(jobsData: EmailJobData[]): Promise<void> {
     const bullJobs = jobsData.map((data) => ({
-      name: 'send-email',
+      name: data.type,
       data,
       opts: {
         attempts: 3,

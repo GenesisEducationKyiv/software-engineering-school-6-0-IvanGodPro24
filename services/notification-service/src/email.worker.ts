@@ -3,12 +3,24 @@ import { Redis } from 'ioredis';
 import { ISubscriptionEmailService } from './subscription-email.service.js';
 import { ILogger } from './logger.js';
 
-export type EmailJobData = {
+export type ConfirmSubscriptionEmailJobData = {
+  type: 'confirm-subscription';
+  email: string;
+  repoName: string;
+  confirmToken: string;
+};
+
+export type NewReleaseEmailJobData = {
+  type: 'new-release';
   email: string;
   repoName: string;
   tag: string;
   unsubscribeToken: string;
 };
+
+export type EmailJobData =
+  | ConfirmSubscriptionEmailJobData
+  | NewReleaseEmailJobData;
 
 export class EmailWorker {
   private worker: Worker<EmailJobData> | null = null;
@@ -44,16 +56,31 @@ export class EmailWorker {
   }
 
   private async processJob(job: Job<EmailJobData>): Promise<void> {
-    const { email, repoName, tag, unsubscribeToken } = job.data;
+    const data = job.data;
 
-    this.logger.info({ jobId: job.id, email }, 'Processing job: Sending email');
-
-    await this.emailService.sendNewReleaseEmail(
-      email,
-      repoName,
-      tag,
-      unsubscribeToken,
+    this.logger.info(
+      { jobId: job.id, email: data.email, type: data.type },
+      'Processing email job',
     );
+
+    switch (data.type) {
+      case 'confirm-subscription':
+        await this.emailService.sendConfirmEmail(
+          data.email,
+          data.repoName,
+          data.confirmToken,
+        );
+        return;
+
+      case 'new-release':
+        await this.emailService.sendNewReleaseEmail(
+          data.email,
+          data.repoName,
+          data.tag,
+          data.unsubscribeToken,
+        );
+        return;
+    }
   }
 
   private setupListeners(): void {

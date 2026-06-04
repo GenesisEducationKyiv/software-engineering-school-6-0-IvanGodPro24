@@ -30,6 +30,7 @@ describe('scanner.service', () => {
   } as unknown as jest.Mocked<IGitHubClient>;
 
   const mockEmailQueue = {
+    addEmail: jest.fn(),
     addBulkEmails: jest.fn(),
   } as jest.Mocked<IEmailQueue>;
 
@@ -127,12 +128,14 @@ describe('scanner.service', () => {
     );
     expect(mockEmailQueue.addBulkEmails).toHaveBeenCalledWith([
       {
+        type: 'new-release',
         email: 'user1@test.com',
         repoName: 'facebook/react',
         tag: 'v19.0.0',
         unsubscribeToken: 'tkn1',
       },
       {
+        type: 'new-release',
         email: 'user2@test.com',
         repoName: 'facebook/react',
         tag: 'v19.0.0',

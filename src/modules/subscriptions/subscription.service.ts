@@ -7,6 +7,7 @@ import { ISubscriptionRepository } from './subscription.repository.js';
 import { ISubscriptionQueryRepository } from './subscription-query.repository.js';
 import { IGitHubClient } from '../github/github.service.js';
 import { GithubRepoId } from '../repositories/github-repo-id.js';
+import { IEmailQueue } from '../scanner/scanner.service.js';
 
 export interface ISubscriptionEmailService {
   sendConfirmEmail(
@@ -27,7 +28,7 @@ export class SubscriptionService {
     private readonly repoRepository: ITrackedRepoRepository,
     private readonly subscriptionRepository: ISubscriptionRepository,
     private readonly subscriptionQueryRepository: ISubscriptionQueryRepository,
-    private readonly emailService: ISubscriptionEmailService,
+    private readonly emailQueue: IEmailQueue,
     private readonly githubClient: IGitHubClient,
   ) {}
 
@@ -71,11 +72,12 @@ export class SubscriptionService {
           { confirmToken: randomUUID() },
         );
 
-        await this.emailService.sendConfirmEmail(
-          updated.email,
+        await this.emailQueue.addEmail({
+          type: 'confirm-subscription',
+          email: updated.email,
           repoName,
-          updated.confirmToken,
-        );
+          confirmToken: updated.confirmToken,
+        });
 
         return updated;
       }
@@ -95,11 +97,12 @@ export class SubscriptionService {
         repository.id,
       );
 
-      await this.emailService.sendConfirmEmail(
-        subscription.email,
-        repository.name,
-        subscription.confirmToken,
-      );
+      await this.emailQueue.addEmail({
+        type: 'confirm-subscription',
+        email: subscription.email,
+        repoName: repository.name,
+        confirmToken: subscription.confirmToken,
+      });
 
       return subscription;
     } catch (error) {

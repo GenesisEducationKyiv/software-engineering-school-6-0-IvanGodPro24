@@ -6,6 +6,7 @@ import { EmailJobData } from '../notifications/email-job.types.js';
 import { GithubRepoId } from '../repositories/github-repo-id.js';
 
 export interface IEmailQueue {
+  addEmail(jobData: EmailJobData): Promise<void>;
   addBulkEmails(jobsData: EmailJobData[]): Promise<void>;
 }
 
@@ -54,6 +55,7 @@ export class ScannerService {
 
             await this.emailQueue.addBulkEmails(
               subscriptions.map((sub) => ({
+                type: 'new-release',
                 email: sub.email,
                 repoName: repo.name,
                 tag: latestTag,
