@@ -115,7 +115,7 @@
           "refId": "A"
         }
       ],
-      "title": "sum(rate(http_requests_total[1m]))",
+      "title": "Request Rate (per minute)",
       "type": "timeseries"
     },
     {
@@ -209,7 +209,7 @@
           "refId": "A"
         }
       ],
-      "title": "sum(rate(http_requests_total{status_code=~\"4..|5..\"}[1m]))",
+      "title": "Error Rate (4xx & 5xx per minute)",
       "type": "timeseries"
     },
     {
@@ -304,7 +304,7 @@
           "refId": "A"
         }
       ],
-      "title": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1m])) by (le))",
+      "title": "95th Percentile Response Time",
       "type": "timeseries"
     }
   ],

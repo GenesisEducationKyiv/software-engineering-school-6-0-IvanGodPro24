@@ -9,7 +9,7 @@ export const httpRequestsTotal = new client.Counter({
   labelNames: ['method', 'route', 'status_code'],
 });
 
-export const httpRequestDurationMicroseconds = new client.Histogram({
+export const httpRequestDurationSeconds = new client.Histogram({
   name: 'http_request_duration_seconds',
   help: 'Duration of HTTP requests in seconds',
   labelNames: ['method', 'route', 'status_code'],
@@ -25,7 +25,7 @@ export const metricsMiddleware = (
     return next();
   }
 
-  const end = httpRequestDurationMicroseconds.startTimer();
+  const end = httpRequestDurationSeconds.startTimer();
 
   res.on('finish', () => {
     const labels = {
