@@ -203,13 +203,20 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(http_requests_total{status_code=~\"4..|5..\"}[1m]))",
-          "legendFormat": "__auto",
+          "expr": "sum(rate(http_requests_total{status_code=~\"5..\"}[1m]))",
+          "legendFormat": "5xx (Server Errors)",
           "range": true,
           "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(http_requests_total{status_code=~\"4..\"}[1m]))",
+          "legendFormat": "4xx (Client Errors)",
+          "range": true,
+          "refId": "B"
         }
       ],
-      "title": "Error Rate (4xx & 5xx per minute)",
+      "title": "Error Rate by Type (per minute)",
       "type": "timeseries"
     },
     {
