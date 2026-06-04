@@ -1,6 +1,6 @@
 import { Queue } from 'bullmq';
 import { IEmailQueue } from '../modules/scanner/scanner.service.js';
-import { EmailJobData } from './email.worker.js';
+import { EmailJobData } from '../modules/notifications/email-job.types.js';
 
 export class EmailQueueAdapter implements IEmailQueue {
   constructor(private readonly queue: Queue) {}
