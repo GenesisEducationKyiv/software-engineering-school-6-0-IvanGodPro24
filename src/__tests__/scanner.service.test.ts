@@ -6,7 +6,7 @@ import {
 import { ITrackedRepoRepository } from '../modules/repositories/tracked-repo.repository.js';
 import { ISubscriptionQueryRepository } from '../modules/subscriptions/subscription-query.repository.js';
 import { IGitHubClient } from '../modules/github/github.service.js';
-import { ILogger } from '../utils/logger.js';
+import { ILogger } from '../infrastructure/logger/logger.js';
 import {
   SubscriptionEntity,
   TrackedRepoEntity,

@@ -1,6 +1,6 @@
 import { SubscriptionService } from '../modules/subscriptions/subscription.service.js';
 import { SubscriptionController } from '../modules/subscriptions/subscription.controller.js';
-import { PinoLogger } from '../utils/logger.js';
+import { PinoLogger } from '../infrastructure/logger/logger.js';
 import {
   trackedRepoRepository,
   subscriptionRepository,

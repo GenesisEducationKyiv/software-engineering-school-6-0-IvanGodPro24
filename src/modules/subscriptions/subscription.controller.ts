@@ -4,7 +4,7 @@ import {
   GetSubscriptionsInput,
 } from './subscription.schema.js';
 import { SubscriptionService } from './subscription.service.js';
-import { ILogger } from '../../utils/logger.js';
+import { ILogger } from '../../infrastructure/logger/logger.js';
 
 export class SubscriptionController {
   constructor(

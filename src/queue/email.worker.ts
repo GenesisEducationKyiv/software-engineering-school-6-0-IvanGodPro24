@@ -1,7 +1,7 @@
 import { Worker, Job } from 'bullmq';
 import { Redis } from 'ioredis';
 import { ISubscriptionEmailService } from '../modules/subscriptions/subscription.service.js';
-import { ILogger } from '../utils/logger.js';
+import { ILogger } from '../infrastructure/logger/logger.js';
 
 export type EmailJobData = {
   email: string;

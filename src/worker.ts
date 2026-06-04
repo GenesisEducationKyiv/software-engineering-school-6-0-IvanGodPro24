@@ -1,6 +1,6 @@
 import { emailWorker } from './containers/worker.container.js';
-import { PinoLogger } from './utils/logger.js';
-import { redis } from './queue/redis.js';
+import { PinoLogger } from './infrastructure/logger/logger.js';
+import { redis } from './infrastructure/redis/redis.js';
 
 const logger = new PinoLogger('StandaloneWorker');
 

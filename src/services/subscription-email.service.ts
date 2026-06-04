@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import handlebars from 'handlebars';
-import { getEnvVar } from '../utils/getEnvVar.js';
+import { getEnvVar } from '../shared/getEnvVar.js';
 import { IEmailProvider } from './email.service.js';
 import { ISubscriptionEmailService } from '../modules/subscriptions/subscription.service.js';
 

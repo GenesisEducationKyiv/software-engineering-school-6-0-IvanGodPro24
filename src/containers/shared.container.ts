@@ -1,10 +1,10 @@
 import path from 'node:path';
 import axios from 'axios';
-import { getEnvVar } from '../utils/getEnvVar.js';
-import { prisma } from '../db/client.js';
-import { redis } from '../queue/redis.js';
-import { RedisCacheService } from '../services/cache.service.js';
-import { PinoLogger } from '../utils/logger.js';
+import { getEnvVar } from '../shared/getEnvVar.js';
+import { prisma } from '../infrastructure/db/client.js';
+import { redis } from '../infrastructure/redis/redis.js';
+import { RedisCacheService } from '../infrastructure/cache/cache.service.js';
+import { PinoLogger } from '../infrastructure/logger/logger.js';
 import { GitHubClient } from '../modules/github/github.service.js';
 import { NodemailerProvider } from '../services/email.service.js';
 import { SubscriptionEmailService } from '../services/subscription-email.service.js';

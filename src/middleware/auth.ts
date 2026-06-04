@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import createHttpError from 'http-errors';
-import { getEnvVar } from '../utils/getEnvVar.js';
+import { getEnvVar } from '../shared/getEnvVar.js';
 
 export const auth = (req: Request, _res: Response, next: NextFunction) => {
   const apiKey = req.header('x-api-key');

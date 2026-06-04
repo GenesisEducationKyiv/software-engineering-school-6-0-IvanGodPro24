@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import createHttpError from 'http-errors';
-import { ICacheService } from '../../services/cache.service.js';
+import { ICacheService } from '../../infrastructure/cache/cache.service.js';
 
 export interface IGitHubClient {
   checkRepoExists(owner: string, repo: string): Promise<void>;

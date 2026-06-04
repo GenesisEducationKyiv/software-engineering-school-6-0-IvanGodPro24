@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { ICacheService } from '../services/cache.service.js';
+import { ICacheService } from '../infrastructure/cache/cache.service.js';
 import { GitHubClient } from '../modules/github/github.service.js';
 import { AxiosInstance } from 'axios';
 

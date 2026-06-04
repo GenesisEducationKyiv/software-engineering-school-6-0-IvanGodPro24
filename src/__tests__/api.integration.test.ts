@@ -19,8 +19,8 @@ jest.unstable_mockModule('../services/email.service.js', () => ({
 }));
 
 const { app } = await import('../index.js');
-const { prisma } = await import('../db/client.js');
-const { redis } = await import('../queue/redis.js');
+const { prisma } = await import('../infrastructure/db/client.js');
+const { redis } = await import('../infrastructure/redis/redis.js');
 const { emailQueue } = await import('../queue/email.queue.js');
 
 async function seedSubscription(

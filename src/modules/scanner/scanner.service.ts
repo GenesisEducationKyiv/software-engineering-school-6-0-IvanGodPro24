@@ -1,7 +1,7 @@
 import { ITrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
 import { ISubscriptionQueryRepository } from '../subscriptions/subscription-query.repository.js';
 import { IGitHubClient } from '../github/github.service.js';
-import { ILogger } from '../../utils/logger.js';
+import { ILogger } from '../../infrastructure/logger/logger.js';
 import { EmailJobData } from '../../queue/email.worker.js';
 import { GithubRepoId } from '../repositories/github-repo-id.js';
 
