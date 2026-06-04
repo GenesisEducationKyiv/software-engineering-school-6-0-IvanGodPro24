@@ -9,7 +9,7 @@ const bootstrap = async () => {
     emailWorker.start();
     logger.info('Email Worker started successfully');
   } catch (err) {
-    logger.error(`Failed to start Email Worker: ${err}`);
+    logger.error({ err }, 'Failed to start Email Worker');
     process.exit(1);
   }
 

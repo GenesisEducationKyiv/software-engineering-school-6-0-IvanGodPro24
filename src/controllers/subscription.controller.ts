@@ -4,14 +4,23 @@ import {
   GetSubscriptionsInput,
 } from '../validation/subscription.schema.js';
 import { SubscriptionService } from '../services/subscription.service.js';
+import { ILogger } from '../utils/logger.js';
 
 export class SubscriptionController {
-  constructor(private readonly subscriptionService: SubscriptionService) {}
+  constructor(
+    private readonly subscriptionService: SubscriptionService,
+    private readonly logger: ILogger,
+  ) {}
 
   subscribe = async (req: Request, res: Response) => {
     const { email, repo } = req.body as SubscribeInput;
 
     await this.subscriptionService.createSubscription(email, repo);
+
+    this.logger.info(
+      { email, repo },
+      'Successfully subscribed user to repository',
+    );
 
     res.status(200).json({
       message: 'Subscription created. Please confirm your email.',

@@ -1,14 +1,18 @@
 import pino, { Logger } from 'pino';
 
 export interface ILogger {
-  info(msg: string): void;
-  warn(msg: string): void;
-  error(msg: string): void;
-  debug(msg: string): void;
+  info(msgOrObj: unknown, msg?: string): void;
+  warn(msgOrObj: unknown, msg?: string): void;
+  error(msgOrObj: unknown, msg?: string): void;
+  debug(msgOrObj: unknown, msg?: string): void;
 }
 
 const baseLogger = pino({
   level: process.env.LOG_LEVEL ?? 'info',
+  redact: {
+    paths: ['email', 'to', 'token'],
+    censor: '[REDACTED]',
+  },
   transport:
     process.env.NODE_ENV !== 'production'
       ? { target: 'pino-pretty', options: { colorize: true } }
@@ -22,19 +26,24 @@ export class PinoLogger implements ILogger {
     this.logger = baseLogger.child({ context });
   }
 
-  info(msg: string) {
-    this.logger.info(msg);
+  private log(level: pino.Level, msgOrObj: unknown, msg?: string) {
+    if (msg !== undefined) {
+      this.logger[level](msgOrObj as object, msg);
+    } else {
+      this.logger[level](msgOrObj as string);
+    }
   }
 
-  warn(msg: string) {
-    this.logger.warn(msg);
+  info(msgOrObj: unknown, msg?: string) {
+    this.log('info', msgOrObj, msg);
   }
-
-  error(msg: string) {
-    this.logger.error(msg);
+  warn(msgOrObj: unknown, msg?: string) {
+    this.log('warn', msgOrObj, msg);
   }
-
-  debug(msg: string) {
-    this.logger.debug(msg);
+  error(msgOrObj: unknown, msg?: string) {
+    this.log('error', msgOrObj, msg);
+  }
+  debug(msgOrObj: unknown, msg?: string) {
+    this.log('debug', msgOrObj, msg);
   }
 }

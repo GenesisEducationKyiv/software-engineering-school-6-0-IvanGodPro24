@@ -3,7 +3,13 @@ import { Request, Response, NextFunction } from 'express';
 
 client.collectDefaultMetrics();
 
-export const httpRequestDurationMicroseconds = new client.Histogram({
+export const httpRequestsTotal = new client.Counter({
+  name: 'http_requests_total',
+  help: 'Total number of HTTP requests',
+  labelNames: ['method', 'route', 'status_code'],
+});
+
+export const httpRequestDurationSeconds = new client.Histogram({
   name: 'http_request_duration_seconds',
   help: 'Duration of HTTP requests in seconds',
   labelNames: ['method', 'route', 'status_code'],
@@ -15,14 +21,22 @@ export const metricsMiddleware = (
   res: Response,
   next: NextFunction,
 ) => {
-  const end = httpRequestDurationMicroseconds.startTimer();
+  if (req.path === '/metrics') {
+    return next();
+  }
+
+  const end = httpRequestDurationSeconds.startTimer();
 
   res.on('finish', () => {
-    end({
+    const labels = {
       method: req.method,
       route: req.route?.path || req.path,
       status_code: res.statusCode,
-    });
+    };
+
+    httpRequestsTotal.inc(labels);
+
+    end(labels);
   });
 
   next();

@@ -11,6 +11,8 @@ export const errorHandler = (
   _next: NextFunction,
 ): void => {
   if (err instanceof HttpError) {
+    logger.warn({ err, status: err.status }, 'Client Error');
+
     res.status(err.status).json({
       status: err.status,
       message: err.name,
@@ -19,7 +21,8 @@ export const errorHandler = (
     return;
   }
 
-  logger.error(`Unhandled error: ${err.message}`);
+  logger.error({ err }, 'Unhandled error occurred');
+
   res
     .status(500)
     .json({ message: 'Something went wrong!', error: err.message });

@@ -46,7 +46,7 @@ export class EmailWorker {
   private async processJob(job: Job<EmailJobData>): Promise<void> {
     const { email, repoName, tag, unsubscribeToken } = job.data;
 
-    this.logger.info(`Processing job ${job.id}: Sending email to ${email}`);
+    this.logger.info({ jobId: job.id, email }, 'Processing job: Sending email');
 
     await this.emailService.sendNewReleaseEmail(
       email,
@@ -61,13 +61,15 @@ export class EmailWorker {
 
     this.worker.on('completed', (job) => {
       this.logger.info(
-        `Job ${job.id} completed. Email sent to ${job.data.email}`,
+        { jobId: job.id, email: job.data.email },
+        'Job completed. Email sent',
       );
     });
 
     this.worker.on('failed', (job, err) => {
       this.logger.error(
-        `Job ${job?.id} failed for ${job?.data.email}: ${err.message}`,
+        { err, jobId: job?.id, email: job?.data?.email },
+        'Job failed',
       );
     });
   }
