@@ -2,9 +2,9 @@ import { Request, Response } from 'express';
 import {
   SubscribeInput,
   GetSubscriptionsInput,
-} from '../validation/subscription.schema.js';
-import { SubscriptionService } from '../services/subscription.service.js';
-import { ILogger } from '../utils/logger.js';
+} from './subscription.schema.js';
+import { SubscriptionService } from './subscription.service.js';
+import { ILogger } from '../../utils/logger.js';
 
 export class SubscriptionController {
   constructor(

@@ -2,16 +2,16 @@ import { jest } from '@jest/globals';
 import {
   SubscriptionEntity,
   TrackedRepoEntity,
-} from '../domain/subscription.entity.js';
+} from '../modules/subscriptions/subscription.entity.js';
 import {
   ISubscriptionEmailService,
   SubscriptionService,
-} from '../services/subscription.service.js';
-import { TrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
-import { SubscriptionRepository } from '../repositories/subscription.repository.js';
-import { IGitHubClient } from '../services/github.service.js';
-import { SubscriptionQueryRepository } from '../repositories/subscription-query.repository.js';
-import { UniqueConstraintError } from '../domain/errors.js';
+} from '../modules/subscriptions/subscription.service.js';
+import { TrackedRepoRepository } from '../modules/repositories/tracked-repo.repository.js';
+import { SubscriptionRepository } from '../modules/subscriptions/subscription.repository.js';
+import { IGitHubClient } from '../modules/github/github.service.js';
+import { SubscriptionQueryRepository } from '../modules/subscriptions/subscription-query.repository.js';
+import { UniqueConstraintError } from '../shared/errors.js';
 
 const mockRepoRepository = {
   upsert: jest.fn(),

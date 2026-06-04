@@ -3,7 +3,7 @@ import path from 'node:path';
 import handlebars from 'handlebars';
 import { getEnvVar } from '../utils/getEnvVar.js';
 import { IEmailProvider } from './email.service.js';
-import { ISubscriptionEmailService } from './subscription.service.js';
+import { ISubscriptionEmailService } from '../modules/subscriptions/subscription.service.js';
 
 export class SubscriptionEmailService implements ISubscriptionEmailService {
   constructor(

@@ -1,5 +1,5 @@
 import { Queue } from 'bullmq';
-import { IEmailQueue } from '../services/scanner.service.js';
+import { IEmailQueue } from '../modules/scanner/scanner.service.js';
 import { EmailJobData } from './email.worker.js';
 
 export class EmailQueueAdapter implements IEmailQueue {

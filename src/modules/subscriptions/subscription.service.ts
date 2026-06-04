@@ -1,12 +1,12 @@
 import createHttpError from 'http-errors';
 import { randomUUID } from 'node:crypto';
-import { UniqueConstraintError } from '../domain/errors.js';
-import { SubscriptionEntity } from '../domain/subscription.entity.js';
+import { UniqueConstraintError } from '../../shared/errors.js';
+import { SubscriptionEntity } from './subscription.entity.js';
 import { ITrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
-import { ISubscriptionRepository } from '../repositories/subscription.repository.js';
-import { ISubscriptionQueryRepository } from '../repositories/subscription-query.repository.js';
-import { IGitHubClient } from './github.service.js';
-import { GithubRepoId } from '../domain/github-repo-id.js';
+import { ISubscriptionRepository } from './subscription.repository.js';
+import { ISubscriptionQueryRepository } from './subscription-query.repository.js';
+import { IGitHubClient } from '../github/github.service.js';
+import { GithubRepoId } from '../repositories/github-repo-id.js';
 
 export interface ISubscriptionEmailService {
   sendConfirmEmail(

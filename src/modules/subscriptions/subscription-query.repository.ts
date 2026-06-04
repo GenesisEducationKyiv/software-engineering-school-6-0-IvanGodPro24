@@ -3,7 +3,7 @@ import {
   SubStatus,
   SubscriptionEntity,
   SubscriptionWithRepoEntity,
-} from '../domain/subscription.entity.js';
+} from './subscription.entity.js';
 
 export interface ISubscriptionQueryRepository {
   findByEmailAndStatusWithRepo(

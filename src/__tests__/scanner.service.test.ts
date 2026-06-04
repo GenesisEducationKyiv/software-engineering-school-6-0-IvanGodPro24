@@ -1,13 +1,16 @@
 import { jest } from '@jest/globals';
-import { ScannerService, IEmailQueue } from '../services/scanner.service.js';
-import { ITrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
-import { ISubscriptionQueryRepository } from '../repositories/subscription-query.repository.js';
-import { IGitHubClient } from '../services/github.service.js';
+import {
+  ScannerService,
+  IEmailQueue,
+} from '../modules/scanner/scanner.service.js';
+import { ITrackedRepoRepository } from '../modules/repositories/tracked-repo.repository.js';
+import { ISubscriptionQueryRepository } from '../modules/subscriptions/subscription-query.repository.js';
+import { IGitHubClient } from '../modules/github/github.service.js';
 import { ILogger } from '../utils/logger.js';
 import {
   SubscriptionEntity,
   TrackedRepoEntity,
-} from '../domain/subscription.entity.js';
+} from '../modules/subscriptions/subscription.entity.js';
 
 describe('scanner.service', () => {
   let scannerService: ScannerService;

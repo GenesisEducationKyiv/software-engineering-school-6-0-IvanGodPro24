@@ -1,4 +1,4 @@
-import { ScannerService } from '../services/scanner.service.js';
+import { ScannerService } from '../modules/scanner/scanner.service.js';
 import { EmailQueueAdapter } from '../queue/email-queue.adapter.js';
 import { emailQueue } from '../queue/email.queue.js';
 import { PinoLogger } from '../utils/logger.js';
