@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { Redis } from 'ioredis';
 import { getEnvVar } from './getEnvVar.js';
 import { PinoLogger } from './logger.js';
@@ -13,10 +14,8 @@ const redis = new Redis(getEnvVar('REDIS_URL'), {
 
 const emailProvider = new NodemailerProvider();
 
-const emailService = new SubscriptionEmailService(
-  emailProvider,
-  new URL('./templates', import.meta.url).pathname,
-);
+const templateDir = path.join(process.cwd(), 'src', 'templates');
+const emailService = new SubscriptionEmailService(emailProvider, templateDir);
 
 const emailWorker = new EmailWorker(redis, emailService, logger);
 
