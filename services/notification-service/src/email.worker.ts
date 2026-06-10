@@ -1,26 +1,8 @@
 import { Worker, Job } from 'bullmq';
 import { Redis } from 'ioredis';
+import { EmailJobData } from '@github-notifier/notification-contracts';
 import { ISubscriptionEmailService } from './subscription-email.service.js';
 import { ILogger } from './logger.js';
-
-export type ConfirmSubscriptionEmailJobData = {
-  type: 'confirm-subscription';
-  email: string;
-  repoName: string;
-  confirmToken: string;
-};
-
-export type NewReleaseEmailJobData = {
-  type: 'new-release';
-  email: string;
-  repoName: string;
-  tag: string;
-  unsubscribeToken: string;
-};
-
-export type EmailJobData =
-  | ConfirmSubscriptionEmailJobData
-  | NewReleaseEmailJobData;
 
 export class EmailWorker {
   private worker: Worker<EmailJobData> | null = null;

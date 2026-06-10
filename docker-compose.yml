@@ -41,7 +41,8 @@ services:
 
   notification-service:
     build:
-      context: ./services/notification-service
+      context: .
+      dockerfile: services/notification-service/Dockerfile
     container_name: github_notifier_notification_service
     restart: unless-stopped
     depends_on:

@@ -32,10 +32,19 @@ jobs:
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
+            packages/notification-contracts/package-lock.json
             services/notification-service/package-lock.json
 
-      - name: Install dependencies
+      - name: Install root dependencies
         run: npm ci
+
+      - name: Install notification contracts dependencies
+        working-directory: packages/notification-contracts
+        run: npm ci
+
+      - name: Build notification contracts
+        working-directory: packages/notification-contracts
+        run: npm run build
 
       - name: Run linter
         run: npm run lint

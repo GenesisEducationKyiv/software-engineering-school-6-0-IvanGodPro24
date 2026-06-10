@@ -37,6 +37,7 @@
   },
   "homepage": "https://github.com/IvanGodPro24/github-release-notification-api#readme",
   "dependencies": {
+    "@github-notifier/notification-contracts": "file:packages/notification-contracts",
     "@bull-board/api": "^6.21.0",
     "@bull-board/express": "^6.21.0",
     "@prisma/adapter-pg": "^7.7.0",

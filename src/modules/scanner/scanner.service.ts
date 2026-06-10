@@ -2,7 +2,7 @@ import { ITrackedRepoRepository } from '../repositories/tracked-repo.repository.
 import { ISubscriptionQueryRepository } from '../subscriptions/subscription-query.repository.js';
 import { IGitHubClient } from '../github/github.service.js';
 import { ILogger } from '../../infrastructure/logger/logger.js';
-import { EmailJobData } from '../notifications/email-job.types.js';
+import { EmailJobData } from '@github-notifier/notification-contracts';
 import { GithubRepoId } from '../repositories/github-repo-id.js';
 
 export interface IEmailQueue {
