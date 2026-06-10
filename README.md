@@ -223,3 +223,22 @@ The project now follows a **modular monolith + microservice** approach.
 The root application is responsible for subscription management, GitHub repository tracking, scheduled scanning, API endpoints, persistence, and publishing notification jobs.
 
 The extracted `notification-service` is responsible for consuming email jobs from Redis/BullMQ, rendering email templates, and sending emails through SMTP. The main API no longer owns Nodemailer, SMTP integration, or email templates.
+
+### Redis and BullMQ Roles
+
+Redis is used in two separate roles:
+
+1. **Cache storage** for GitHub API responses. This reduces repeated external calls and helps the app handle GitHub API rate limits more gracefully.
+2. **Message broker backend** for BullMQ queues. BullMQ stores email jobs in Redis so they can be processed asynchronously by the notification microservice.
+
+The email delivery flow is:
+
+```txt
+Main API
+  -> publishes email command to BullMQ
+  -> Redis stores the job
+  -> Notification Service consumes the job
+  -> SMTP provider sends email
+```
+
+This keeps HTTP request handling independent from email delivery. If SMTP is slow or temporarily unavailable, the API can still publish a job quickly, while BullMQ handles retries and the Notification Service processes the queue separately.
