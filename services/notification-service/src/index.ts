@@ -5,6 +5,7 @@ import { PinoLogger } from './logger.js';
 import { NodemailerProvider } from './email.service.js';
 import { SubscriptionEmailService } from './subscription-email.service.js';
 import { EmailWorker } from './email.worker.js';
+import { EmailJobHandler } from './email-job.handler.js';
 
 const logger = new PinoLogger('NotificationService');
 
@@ -17,7 +18,9 @@ const emailProvider = new NodemailerProvider();
 const templateDir = path.join(process.cwd(), 'src', 'templates');
 const emailService = new SubscriptionEmailService(emailProvider, templateDir);
 
-const emailWorker = new EmailWorker(redis, emailService, logger);
+const emailJobHandler = new EmailJobHandler(emailService);
+
+const emailWorker = new EmailWorker(redis, emailJobHandler, logger);
 
 const shutdown = async (signal: string) => {
   logger.info(`Received ${signal}. Shutting down notification service...`);

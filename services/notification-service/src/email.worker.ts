@@ -1,7 +1,7 @@
 import { Worker, Job } from 'bullmq';
 import { Redis } from 'ioredis';
 import { EmailJobData } from '@github-notifier/notification-contracts';
-import { ISubscriptionEmailService } from './subscription-email.service.js';
+import { EmailJobHandler } from './email-job.handler.js';
 import { ILogger } from './logger.js';
 
 export class EmailWorker {
@@ -9,7 +9,7 @@ export class EmailWorker {
 
   constructor(
     private readonly redisConnection: Redis,
-    private readonly emailService: ISubscriptionEmailService,
+    private readonly emailJobHandler: EmailJobHandler,
     private readonly logger: ILogger,
   ) {}
 
@@ -45,24 +45,7 @@ export class EmailWorker {
       'Processing email job',
     );
 
-    switch (data.type) {
-      case 'confirm-subscription':
-        await this.emailService.sendConfirmEmail(
-          data.email,
-          data.repoName,
-          data.confirmToken,
-        );
-        return;
-
-      case 'new-release':
-        await this.emailService.sendNewReleaseEmail(
-          data.email,
-          data.repoName,
-          data.tag,
-          data.unsubscribeToken,
-        );
-        return;
-    }
+    await this.emailJobHandler.handle(data);
   }
 
   private setupListeners(): void {
