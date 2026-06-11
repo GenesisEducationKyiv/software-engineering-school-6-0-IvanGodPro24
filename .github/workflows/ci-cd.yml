@@ -164,6 +164,10 @@ jobs:
         working-directory: packages/notification-contracts
         run: npm ci
 
+      - name: Build notification contracts
+        working-directory: packages/notification-contracts
+        run: npm run build
+
       - name: Install dependencies
         run: npm ci
 
