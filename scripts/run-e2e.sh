@@ -31,7 +31,10 @@ export SMTP_PORT="1025"
 echo "Applying migrations..."
 npx prisma migrate deploy
 
-echo "Building the project"
+echo "Building notification contracts..."
+npm run build:contracts
+
+echo "Building the project..."
 npm run build
 
 echo "Running Playwright E2E tests..."
