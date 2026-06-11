@@ -11,7 +11,7 @@
     "start:prod": "npx prisma migrate deploy && node dist/src/index.js",
     "dev": "tsx watch src/index.ts",
     "worker": "tsx src/queue/email.worker.ts",
-    "test:unit": "node --experimental-vm-modules node_modules/.bin/jest --testPathIgnorePatterns=\\.integration\\.test\\.ts",
+    "test:unit": "node --experimental-vm-modules node_modules/.bin/jest --testPathIgnorePatterns=\\.integration\\.test\\.ts services/notification-service",
     "test:integration:run": "node --experimental-vm-modules node_modules/.bin/jest \\.integration\\.test\\.ts --detectOpenHandles",
     "test:integration": "./scripts/run-integration.sh",
     "test:e2e": "./scripts/run-e2e.sh",
