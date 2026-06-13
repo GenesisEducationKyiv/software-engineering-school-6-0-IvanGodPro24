@@ -31,8 +31,8 @@ export SMTP_PORT="1025"
 echo "Applying migrations..."
 npx prisma migrate deploy
 
-echo "Building notification contracts..."
-npm run build:contracts
+echo "Building shared packages..."
+npm run build:packages
 
 echo "Building the project..."
 npm run build

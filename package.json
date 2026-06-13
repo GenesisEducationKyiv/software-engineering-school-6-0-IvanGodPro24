@@ -3,17 +3,19 @@
   "version": "1.0.0",
   "private": true,
   "workspaces": [
-    "packages/notification-contracts",
-    "services/notification-service"
+    "packages/*",
+    "services/*"
   ],
   "description": "API for subscribing to GitHub repository release notifications via email",
   "main": "dist/src/index.js",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "npm run generate && npm run build-docs && tsc",
+    "build:shared": "npm run build -w @github-notifier/shared",
     "build:contracts": "npm run build -w @github-notifier/notification-contracts",
+    "build:packages": "npm run build:shared && npm run build:contracts",
     "build:notification-service": "npm run build -w notification-service",
-    "build:all": "npm run build:contracts && npm run build && npm run build:notification-service",
+    "build:all": "npm run build:packages && npm run build && npm run build:notification-service",
     "lint": "eslint .",
     "start": "node dist/src/index.js",
     "start:prod": "npx prisma migrate deploy && node dist/src/index.js",
@@ -28,8 +30,6 @@
     "migrate": "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
     "generate": "prisma generate",
-    "postinstall": "prisma generate",
-    "prebuild": "npm run build-docs",
     "predev": "npm run build-docs",
     "build-docs": "redocly bundle docs/openapi.yaml --ext json -o docs/swagger.json",
     "preview-docs": "redocly preview"
@@ -47,6 +47,7 @@
   "homepage": "https://github.com/IvanGodPro24/github-release-notification-api#readme",
   "dependencies": {
     "@github-notifier/notification-contracts": "1.0.0",
+    "@github-notifier/shared": "1.0.0",
     "@bull-board/api": "^6.21.0",
     "@bull-board/express": "^6.21.0",
     "@prisma/adapter-pg": "^7.7.0",

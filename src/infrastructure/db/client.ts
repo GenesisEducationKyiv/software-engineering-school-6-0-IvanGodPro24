@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
-import { getEnvVar } from '../../shared/getEnvVar.js';
+import { getEnvVar } from '@github-notifier/shared';
 
 const pool = new Pool({ connectionString: getEnvVar('DATABASE_URL') });
 const adapter = new PrismaPg(pool);

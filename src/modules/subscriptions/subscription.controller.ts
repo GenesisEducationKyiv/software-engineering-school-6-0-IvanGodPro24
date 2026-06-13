@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
+import { ILogger } from '@github-notifier/shared';
 import {
   SubscribeInput,
   GetSubscriptionsInput,
 } from './subscription.schema.js';
 import { SubscriptionService } from './subscription.service.js';
-import { ILogger } from '../../infrastructure/logger/logger.js';
 
 export class SubscriptionController {
   constructor(

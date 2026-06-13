@@ -5,14 +5,14 @@ import {
   metricsMiddleware,
   getMetrics,
 } from './infrastructure/metrics/metrics.js';
-import { getEnvVar } from './shared/getEnvVar.js';
+import { getEnvVar } from '@github-notifier/shared';
+import { PinoLogger } from '@github-notifier/shared';
 import { notFoundHandler } from './middleware/notFoundHandler.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import rootRouter from './routes/index.js';
 import { scannerService } from './containers/scanner.container.js';
 import { bullBoardRouter } from './queue/dashboard.js';
 import { swaggerDocs } from './infrastructure/swagger/swaggerDocs.js';
-import { PinoLogger } from './infrastructure/logger/logger.js';
 
 const logger = new PinoLogger('App');
 

@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { Redis } from 'ioredis';
-import { getEnvVar } from './getEnvVar.js';
-import { PinoLogger } from './logger.js';
+import { getEnvVar } from '@github-notifier/shared';
+import { PinoLogger } from '@github-notifier/shared';
 import { NodemailerProvider } from './email.service.js';
 import { SubscriptionEmailService } from './subscription-email.service.js';
 import { EmailWorker } from './email.worker.js';

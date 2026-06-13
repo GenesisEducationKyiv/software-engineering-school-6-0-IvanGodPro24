@@ -1,8 +1,8 @@
 import { Worker, Job } from 'bullmq';
 import { Redis } from 'ioredis';
 import { EmailJobData } from '@github-notifier/notification-contracts';
+import { ILogger } from '@github-notifier/shared';
 import { EmailJobHandler } from './email-job.handler.js';
-import { ILogger } from './logger.js';
 
 export class EmailWorker {
   private worker: Worker<EmailJobData> | null = null;

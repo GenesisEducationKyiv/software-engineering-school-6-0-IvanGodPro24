@@ -1,5 +1,5 @@
 import { Redis } from 'ioredis';
-import { ILogger } from '../logger/logger.js';
+import { ILogger } from '@github-notifier/shared';
 
 export interface ICacheService {
   get<T>(key: string): Promise<T | null>;
