@@ -1,3 +1,5 @@
+import { TrackedRepoEntity } from '../repositories/tracked-repo.entity.js';
+
 export type SubStatus = 'PENDING' | 'ACTIVE' | 'UNSUBSCRIBED';
 
 export interface SubscriptionEntity {
@@ -7,14 +9,6 @@ export interface SubscriptionEntity {
   confirmToken: string;
   unsubscribeToken: string;
   repositoryId: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface TrackedRepoEntity {
-  id: string;
-  name: string;
-  lastSeenTag: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
