@@ -72,5 +72,5 @@ SMTP Provider
 **Негативні:**
 
 * Збільшилась кількість частин системи, які потрібно підтримувати.
-* Потрібно синхронізувати контракт email jobs між основним API та Notification Service.
+* Потрібно підтримувати versioning і build package `@github-notifier/notification-contracts`, який містить контракт email jobs між основним API та Notification Service.
 * Для повноцінного локального запуску тепер потрібно запускати не лише API, PostgreSQL і Redis, а й Notification Service.

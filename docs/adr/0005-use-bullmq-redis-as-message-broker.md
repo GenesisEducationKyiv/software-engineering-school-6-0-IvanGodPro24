@@ -67,7 +67,7 @@ Redis
 
 Main API створює задачі в черзі `email-queue`. Redis зберігає стан задач, а Notification Service запускає BullMQ worker, який споживає задачі та відправляє email через SMTP.
 
-Поточний контракт задачі визначається типом `EmailJobData` і підтримує два типи email:
+Поточний контракт задачі визначається типом `EmailJobData` з package `@github-notifier/notification-contracts` і підтримує два типи email:
 
 * `confirm-subscription` — лист підтвердження підписки.
 * `new-release` — лист про новий реліз.
@@ -94,7 +94,11 @@ Notification Service обробляє чергу з `concurrency: 5`, тобто
 **Негативні:**
 
 * Redis тепер використовується і як cache, і як storage/transport для BullMQ, тому його відмова впливає одразу на кешування та email-чергу.
-* BullMQ не є повноцінною заміною RabbitMQ для складного routing, exchanges, advanced acknowledgements або складної міжсервісної маршрутизації.
-* BullMQ не замінює Kafka для event history, replay, analytics pipelines або high-throughput event streaming.
-* Потрібно підтримувати спільний контракт `EmailJobData` між Main API та Notification Service.
+* Потрібно підтримувати versioning і build package `@github-notifier/notification-contracts`, щоб Main API та Notification Service використовували сумісний контракт `EmailJobData`.
 * Для production-рівня потрібно окремо продумати persistence Redis, моніторинг черги, alerting для failed jobs.
+
+**Обмеження:**
+
+* Поточному сценарію email notifications не потрібні складний routing, exchanges, event history, replay або analytics pipelines.
+* Якщо в майбутньому система потребуватиме складної міжсервісної маршрутизації, варто окремо переглянути RabbitMQ.
+* Якщо з'явиться потреба в event streaming, довготривалій історії подій, replay або analytics pipelines, варто окремо переглянути Kafka.
