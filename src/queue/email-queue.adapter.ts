@@ -1,5 +1,5 @@
 import { Queue } from 'bullmq';
-import { IEmailQueue } from '../modules/scanner/scanner.service.js';
+import { IEmailQueue } from './email-queue.port.js';
 import { EmailJobData } from '@github-notifier/notification-contracts';
 
 export class EmailQueueAdapter implements IEmailQueue {

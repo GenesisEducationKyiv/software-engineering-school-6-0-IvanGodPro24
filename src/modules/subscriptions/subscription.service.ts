@@ -7,7 +7,7 @@ import { ISubscriptionRepository } from './subscription.repository.js';
 import { ISubscriptionQueryRepository } from './subscription-query.repository.js';
 import { IGitHubClient } from '../github/github.service.js';
 import { GithubRepoId } from '../repositories/github-repo-id.js';
-import { IEmailQueue } from '../scanner/scanner.service.js';
+import { IEmailQueue } from '../../queue/email-queue.port.js';
 
 export class SubscriptionService {
   constructor(

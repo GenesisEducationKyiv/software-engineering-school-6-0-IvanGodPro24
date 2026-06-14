@@ -1,8 +1,8 @@
 import { jest } from '@jest/globals';
 import {
   ScannerService,
-  IEmailQueue,
 } from '../modules/scanner/scanner.service.js';
+import { IEmailQueue } from '../queue/email-queue.port.js';
 import { ITrackedRepoRepository } from '../modules/repositories/tracked-repo.repository.js';
 import { ISubscriptionQueryRepository } from '../modules/subscriptions/subscription-query.repository.js';
 import { IGitHubClient } from '../modules/github/github.service.js';

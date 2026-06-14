@@ -2,13 +2,8 @@ import { ILogger } from '@github-notifier/shared';
 import { ITrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
 import { ISubscriptionQueryRepository } from '../subscriptions/subscription-query.repository.js';
 import { IGitHubClient } from '../github/github.service.js';
-import { EmailJobData } from '@github-notifier/notification-contracts';
 import { GithubRepoId } from '../repositories/github-repo-id.js';
-
-export interface IEmailQueue {
-  addEmail(jobData: EmailJobData): Promise<void>;
-  addBulkEmails(jobsData: EmailJobData[]): Promise<void>;
-}
+import { IEmailQueue } from '../../queue/email-queue.port.js';
 
 export class ScannerService {
   constructor(
