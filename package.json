@@ -20,7 +20,6 @@
     "start": "node dist/src/index.js",
     "start:prod": "npx prisma migrate deploy && node dist/src/index.js",
     "dev": "tsx watch src/index.ts",
-    "worker": "tsx src/queue/email.worker.ts",
     "test:notification-service": "npm run test:unit -w notification-service",
     "test:unit": "node --experimental-vm-modules node_modules/.bin/jest --testPathIgnorePatterns=\\.integration\\.test\\.ts services/notification-service",
     "test:integration:run": "node --experimental-vm-modules node_modules/.bin/jest \\.integration\\.test\\.ts --detectOpenHandles",
