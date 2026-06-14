@@ -11,8 +11,7 @@ RUN npm ci
 
 COPY . .
 
-RUN npm run build:shared
-RUN npm run build:contracts
+RUN npm run build:packages
 RUN DATABASE_URL="postgresql://postgres:postgres@localhost:5432/build" npm run build
 
 EXPOSE 3000

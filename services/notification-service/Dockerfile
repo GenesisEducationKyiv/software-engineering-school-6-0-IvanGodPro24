@@ -13,8 +13,7 @@ COPY packages/shared ./packages/shared
 COPY packages/notification-contracts ./packages/notification-contracts
 COPY services/notification-service ./services/notification-service
 
-RUN npm run build:shared
-RUN npm run build:contracts
+RUN npm run build:packages
 RUN npm run build:notification-service
 
 WORKDIR /app/services/notification-service
