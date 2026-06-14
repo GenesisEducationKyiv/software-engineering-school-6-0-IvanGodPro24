@@ -29,7 +29,7 @@ export REDIS_URL="redis://localhost:6380"
 export API_KEY="super-secret-key"
 
 echo "Deploying migrations to the test db..."
-npx prisma migrate deploy
+npm run db:migrate
 
 echo "Running the integration tests..."
 npm run test:integration:run

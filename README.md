@@ -118,7 +118,7 @@ docker compose up -d --build
 Docker will automatically:
 
 1. Initialize the PostgreSQL database
-2. Run Prisma migrations (`prisma migrate deploy`)
+2. Run Prisma migrations (`npm run db:migrate`)
 3. Start the API server on port `3000`
 4. Start the Notification Service for email delivery
 5. Launch Redis, Prometheus, Grafana, and the logging stack
