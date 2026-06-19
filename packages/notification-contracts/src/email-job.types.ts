@@ -1,5 +1,7 @@
 export type ConfirmSubscriptionEmailJobData = {
   type: 'confirm-subscription';
+  sagaId: string;
+  subscriptionId: string;
   email: string;
   repoName: string;
   confirmToken: string;

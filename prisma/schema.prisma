@@ -35,3 +35,31 @@ model Subscription {
 
   @@unique([email, repositoryId])
 }
+
+enum SubscriptionSagaStatus {
+  STARTED
+  SUBSCRIPTION_CREATED
+  EMAIL_SEND_REQUESTED
+  COMPLETED
+  COMPENSATING
+  COMPENSATED
+  FAILED
+}
+
+model SubscriptionSaga {
+  id                  String                 @id @default(uuid())
+  email               String
+  repoName            String
+  repositoryId        String?
+  subscriptionId      String?
+  createdRepository   Boolean                @default(false)
+  createdSubscription Boolean                @default(false)
+  status              SubscriptionSagaStatus @default(STARTED)
+  currentStep         String?
+  errorMessage        String?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  @@index([status])
+  @@index([subscriptionId])
+}

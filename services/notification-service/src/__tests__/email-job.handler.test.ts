@@ -20,6 +20,8 @@ describe('EmailJobHandler', () => {
 
     await handler.handle({
       type: 'confirm-subscription',
+      sagaId: 'saga-1',
+      subscriptionId: 'sub-1',
       email: 'user@test.com',
       repoName: 'facebook/react',
       confirmToken: 'confirm-token-123',
@@ -65,6 +67,8 @@ describe('EmailJobHandler', () => {
     await expect(
       handler.handle({
         type: 'confirm-subscription',
+        sagaId: 'saga-1',
+        subscriptionId: 'sub-1',
         email: 'user@test.com',
         repoName: 'facebook/react',
         confirmToken: 'confirm-token-123',

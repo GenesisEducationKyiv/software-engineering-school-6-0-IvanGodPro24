@@ -58,7 +58,7 @@ describe('Integration Tests: API Endpoints', () => {
   });
 
   describe('POST /api/subscribe', () => {
-    it('returns 200, creates repository and subscription in the database if the data is valid', async () => {
+    it('returns 202, creates saga, repository and subscription if the data is valid', async () => {
       mockCheckRepoExists.mockResolvedValue(undefined);
 
       const testEmail = `test-${randomUUID()}@example.com`;
@@ -68,8 +68,11 @@ describe('Integration Tests: API Endpoints', () => {
         .post('/api/subscribe')
         .send({ email: testEmail, repo: testRepo });
 
-      expect(res.status).toBe(200);
-      expect(res.body.message).toMatch(/Subscription created/i);
+      expect(res.status).toBe(202);
+      expect(res.body.message).toMatch(/Subscription request accepted/i);
+      expect(res.body.status).toBe('EMAIL_SEND_REQUESTED');
+      expect(res.body.sagaId).toEqual(expect.any(String));
+      expect(res.body.subscriptionId).toEqual(expect.any(String));
 
       const savedRepo = await prisma.repository.findUnique({
         where: { name: testRepo },
@@ -81,9 +84,21 @@ describe('Integration Tests: API Endpoints', () => {
       });
       expect(savedSubscription).not.toBeNull();
       expect(savedSubscription?.status).toBe('PENDING');
+      expect(savedSubscription?.id).toBe(res.body.subscriptionId);
+
+      const savedSaga = await prisma.subscriptionSaga.findUnique({
+        where: { id: res.body.sagaId },
+      });
+
+      expect(savedSaga).not.toBeNull();
+      expect(savedSaga?.status).toBe('EMAIL_SEND_REQUESTED');
+      expect(savedSaga?.subscriptionId).toBe(savedSubscription?.id);
+      expect(savedSaga?.repoName).toBe(testRepo);
 
       expect(mockAddEmail).toHaveBeenCalledWith({
         type: 'confirm-subscription',
+        sagaId: res.body.sagaId,
+        subscriptionId: savedSubscription?.id,
         email: testEmail,
         repoName: testRepo,
         confirmToken: savedSubscription?.confirmToken,
@@ -137,6 +152,13 @@ describe('Integration Tests: API Endpoints', () => {
 
       await seedSubscription(testEmail, testRepo, 'PENDING');
 
+      const savedSaga = await prisma.subscriptionSaga.findFirst({
+        where: { email: testEmail, repoName: testRepo },
+      });
+
+      expect(savedSaga).toBeNull();
+      expect(mockAddEmail).not.toHaveBeenCalled();
+
       const res = await request(app)
         .post('/api/subscribe')
         .send({ email: testEmail, repo: testRepo });
@@ -153,6 +175,13 @@ describe('Integration Tests: API Endpoints', () => {
 
       await seedSubscription(testEmail, testRepo, 'ACTIVE');
 
+      const savedSaga = await prisma.subscriptionSaga.findFirst({
+        where: { email: testEmail, repoName: testRepo },
+      });
+
+      expect(savedSaga).toBeNull();
+      expect(mockAddEmail).not.toHaveBeenCalled();
+
       const res = await request(app)
         .post('/api/subscribe')
         .send({ email: testEmail, repo: testRepo });
@@ -161,7 +190,7 @@ describe('Integration Tests: API Endpoints', () => {
       expect(res.body.data.message).toMatch(/Already subscribed/i);
     });
 
-    it('returns 200, updates status to PENDING and resends email if UNSUBSCRIBED', async () => {
+    it('returns 202, updates status to PENDING and starts saga if UNSUBSCRIBED', async () => {
       mockCheckRepoExists.mockResolvedValue(undefined);
 
       const testEmail = `test-${randomUUID()}@example.com`;
@@ -173,17 +202,31 @@ describe('Integration Tests: API Endpoints', () => {
         .post('/api/subscribe')
         .send({ email: testEmail, repo: testRepo });
 
-      expect(res.status).toBe(200);
-      expect(res.body.message).toMatch(/Subscription created/i);
+      expect(res.status).toBe(202);
+      expect(res.body.message).toMatch(/Subscription request accepted/i);
+      expect(res.body.status).toBe('EMAIL_SEND_REQUESTED');
+      expect(res.body.sagaId).toEqual(expect.any(String));
+      expect(res.body.subscriptionId).toBe(sub.id);
 
       const updatedSub = await prisma.subscription.findUnique({
         where: { id: sub.id },
       });
       expect(updatedSub?.status).toBe('PENDING');
 
+      const savedSaga = await prisma.subscriptionSaga.findUnique({
+        where: { id: res.body.sagaId },
+      });
+
+      expect(savedSaga).not.toBeNull();
+      expect(savedSaga?.status).toBe('EMAIL_SEND_REQUESTED');
+      expect(savedSaga?.subscriptionId).toBe(sub.id);
+      expect(savedSaga?.createdSubscription).toBe(false);
+
       expect(mockAddEmail).toHaveBeenCalledTimes(1);
       expect(mockAddEmail).toHaveBeenCalledWith({
         type: 'confirm-subscription',
+        sagaId: res.body.sagaId,
+        subscriptionId: updatedSub?.id,
         email: testEmail,
         repoName: testRepo,
         confirmToken: updatedSub?.confirmToken,

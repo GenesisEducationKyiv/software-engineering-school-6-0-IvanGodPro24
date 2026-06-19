@@ -2,23 +2,8 @@ import { jest } from '@jest/globals';
 import { SubscriptionEntity } from '../modules/subscriptions/subscription.entity.js';
 import { TrackedRepoEntity } from '../modules/repositories/tracked-repo.entity.js';
 import { SubscriptionService } from '../modules/subscriptions/subscription.service.js';
-import { IEmailQueue } from '../queue/email-queue.port.js';
-import { TrackedRepoRepository } from '../modules/repositories/tracked-repo.repository.js';
-import { SubscriptionRepository } from '../modules/subscriptions/subscription.repository.js';
-import { IGitHubClient } from '../modules/github/github.service.js';
-import { SubscriptionQueryRepository } from '../modules/subscriptions/subscription-query.repository.js';
-import { UniqueConstraintError } from '../shared/errors.js';
-
-const mockRepoRepository = {
-  upsert: jest.fn(),
-  findWithActiveSubscriptions: jest.fn(),
-  updateLastSeenTag: jest.fn(),
-} as unknown as jest.Mocked<TrackedRepoRepository>;
-
-const mockGithubClient = {
-  checkRepoExists: jest.fn(),
-  getLatestRelease: jest.fn(),
-} as jest.Mocked<IGitHubClient>;
+import { ISubscriptionRepository } from '../modules/subscriptions/subscription.repository.js';
+import { ISubscriptionQueryRepository } from '../modules/subscriptions/subscription-query.repository.js';
 
 const mockSubscriptionRepository = {
   findByEmailAndRepoId: jest.fn(),
@@ -26,19 +11,12 @@ const mockSubscriptionRepository = {
   findByUnsubscribeToken: jest.fn(),
   create: jest.fn(),
   updateStatus: jest.fn(),
-  findByEmailAndStatusWithRepo: jest.fn(),
-  findByRepoIdAndStatus: jest.fn(),
-} as unknown as jest.Mocked<SubscriptionRepository>;
+} as jest.Mocked<ISubscriptionRepository>;
 
 const mockSubscriptionQueryRepository = {
   findByEmailAndStatusWithRepo: jest.fn(),
   findByRepoIdAndStatus: jest.fn(),
-} as unknown as jest.Mocked<SubscriptionQueryRepository>;
-
-const mockEmailQueue = {
-  addEmail: jest.fn(),
-  addBulkEmails: jest.fn(),
-} as jest.Mocked<IEmailQueue>;
+} as jest.Mocked<ISubscriptionQueryRepository>;
 
 describe('subscription.service', () => {
   let subscriptionService: SubscriptionService;
@@ -47,151 +25,9 @@ describe('subscription.service', () => {
     jest.clearAllMocks();
 
     subscriptionService = new SubscriptionService(
-      mockRepoRepository,
       mockSubscriptionRepository,
       mockSubscriptionQueryRepository,
-      mockEmailQueue,
-      mockGithubClient,
     );
-  });
-
-  describe('createSubscription', () => {
-    it('creates a new subscription if repo and subscription do not exist', async () => {
-      const repo = { id: 'repo-1', name: 'golang/go' };
-      const subscription = {
-        id: 'sub-1',
-        email: 'test@test.com',
-        confirmToken: 'token-123',
-        repositoryId: 'repo-1',
-      };
-
-      mockGithubClient.checkRepoExists.mockResolvedValue();
-
-      mockRepoRepository.upsert.mockResolvedValue(repo as TrackedRepoEntity);
-      mockSubscriptionRepository.findByEmailAndRepoId.mockResolvedValue(null);
-      mockSubscriptionRepository.create.mockResolvedValue(
-        subscription as SubscriptionEntity,
-      );
-
-      await subscriptionService.createSubscription(
-        'test@test.com',
-        'golang/go',
-      );
-
-      expect(mockGithubClient.checkRepoExists).toHaveBeenCalledWith(
-        'golang',
-        'go',
-      );
-      expect(mockRepoRepository.upsert).toHaveBeenCalledWith('golang/go');
-      expect(mockSubscriptionRepository.create).toHaveBeenCalledWith(
-        'test@test.com',
-        'repo-1',
-      );
-      expect(mockEmailQueue.addEmail).toHaveBeenCalledWith({
-        type: 'confirm-subscription',
-        email: 'test@test.com',
-        repoName: 'golang/go',
-        confirmToken: 'token-123',
-      });
-    });
-
-    it('throws 409 if subscription already exists', async () => {
-      mockRepoRepository.upsert.mockResolvedValue({
-        id: 'repo-1',
-        name: 'golang/go',
-      } as TrackedRepoEntity);
-
-      mockSubscriptionRepository.findByEmailAndRepoId.mockResolvedValue({
-        id: 'sub-1',
-        status: 'PENDING',
-      } as SubscriptionEntity);
-
-      await expect(
-        subscriptionService.createSubscription('test@test.com', 'golang/go'),
-      ).rejects.toMatchObject({ status: 409 });
-    });
-  });
-
-  it('throws 409 if repository throws UniqueConstraintError (race condition during create)', async () => {
-    mockGithubClient.checkRepoExists.mockResolvedValue();
-    mockRepoRepository.upsert.mockResolvedValue({
-      id: 'repo-1',
-      name: 'golang/go',
-    } as TrackedRepoEntity);
-    mockSubscriptionRepository.findByEmailAndRepoId.mockResolvedValue(null);
-
-    mockSubscriptionRepository.create.mockRejectedValue(
-      new UniqueConstraintError('Subscription already exists'),
-    );
-
-    await expect(
-      subscriptionService.createSubscription('test@test.com', 'golang/go'),
-    ).rejects.toMatchObject({ status: 409 });
-  });
-
-  it('throws 409 if subscription is PENDING', async () => {
-    mockRepoRepository.upsert.mockResolvedValue({
-      id: 'repo-1',
-      name: 'golang/go',
-    } as TrackedRepoEntity);
-    mockSubscriptionRepository.findByEmailAndRepoId.mockResolvedValue({
-      id: 'sub-1',
-      status: 'PENDING',
-    } as SubscriptionEntity);
-
-    await expect(
-      subscriptionService.createSubscription('test@test.com', 'golang/go'),
-    ).rejects.toMatchObject({ status: 409 });
-  });
-
-  it('throws 409 if subscription is already ACTIVE', async () => {
-    mockRepoRepository.upsert.mockResolvedValue({
-      id: 'repo-1',
-      name: 'golang/go',
-    } as TrackedRepoEntity);
-    mockSubscriptionRepository.findByEmailAndRepoId.mockResolvedValue({
-      id: 'sub-1',
-      status: 'ACTIVE',
-    } as SubscriptionEntity);
-
-    await expect(
-      subscriptionService.createSubscription('test@test.com', 'golang/go'),
-    ).rejects.toMatchObject({ status: 409 });
-  });
-
-  it('updates status to PENDING and resends email if UNSUBSCRIBED', async () => {
-    mockGithubClient.checkRepoExists.mockResolvedValue();
-    mockRepoRepository.upsert.mockResolvedValue({
-      id: 'repo-1',
-      name: 'golang/go',
-    } as TrackedRepoEntity);
-
-    mockSubscriptionRepository.findByEmailAndRepoId.mockResolvedValue({
-      id: 'sub-1',
-      email: 'test@test.com',
-      status: 'UNSUBSCRIBED',
-    } as SubscriptionEntity);
-
-    mockSubscriptionRepository.updateStatus.mockResolvedValue({
-      id: 'sub-1',
-      email: 'test@test.com',
-      status: 'PENDING',
-      confirmToken: 'new-token',
-    } as SubscriptionEntity);
-
-    await subscriptionService.createSubscription('test@test.com', 'golang/go');
-
-    expect(mockSubscriptionRepository.updateStatus).toHaveBeenCalledWith(
-      'sub-1',
-      'PENDING',
-      expect.objectContaining({ confirmToken: expect.any(String) }),
-    );
-    expect(mockEmailQueue.addEmail).toHaveBeenCalledWith({
-      type: 'confirm-subscription',
-      email: 'test@test.com',
-      repoName: 'golang/go',
-      confirmToken: 'new-token',
-    });
   });
 
   describe('confirmSubscription', () => {

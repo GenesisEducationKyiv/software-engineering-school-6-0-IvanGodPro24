@@ -1,106 +1,12 @@
 import createHttpError from 'http-errors';
-import { randomUUID } from 'node:crypto';
-import { UniqueConstraintError } from '../../shared/errors.js';
-import { SubscriptionEntity } from './subscription.entity.js';
-import { ITrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
 import { ISubscriptionRepository } from './subscription.repository.js';
 import { ISubscriptionQueryRepository } from './subscription-query.repository.js';
-import { IGitHubClient } from '../github/github.service.js';
-import { GithubRepoId } from '../repositories/github-repo-id.js';
-import { IEmailQueue } from '../../queue/email-queue.port.js';
 
 export class SubscriptionService {
   constructor(
-    private readonly repoRepository: ITrackedRepoRepository,
     private readonly subscriptionRepository: ISubscriptionRepository,
     private readonly subscriptionQueryRepository: ISubscriptionQueryRepository,
-    private readonly emailQueue: IEmailQueue,
-    private readonly githubClient: IGitHubClient,
   ) {}
-
-  async createSubscription(email: string, repo: string) {
-    const repoId = new GithubRepoId(repo);
-
-    await this.githubClient.checkRepoExists(repoId.owner, repoId.name);
-
-    const repository = await this.repoRepository.upsert(repoId.fullName);
-
-    const existing = await this.subscriptionRepository.findByEmailAndRepoId(
-      email,
-      repository.id,
-    );
-
-    if (existing) {
-      return this.handleExistingSubscription(existing, repository.name);
-    }
-
-    return this.createNewSubscription(email, repository);
-  }
-
-  private async handleExistingSubscription(
-    existing: SubscriptionEntity,
-    repoName: string,
-  ) {
-    switch (existing.status) {
-      case 'ACTIVE':
-        throw createHttpError(409, 'Already subscribed to this repository');
-
-      case 'PENDING':
-        throw createHttpError(
-          409,
-          'Subscription is pending. Please check your email.',
-        );
-
-      case 'UNSUBSCRIBED': {
-        const updated = await this.subscriptionRepository.updateStatus(
-          existing.id,
-          'PENDING',
-          { confirmToken: randomUUID() },
-        );
-
-        await this.emailQueue.addEmail({
-          type: 'confirm-subscription',
-          email: updated.email,
-          repoName,
-          confirmToken: updated.confirmToken,
-        });
-
-        return updated;
-      }
-
-      default:
-        throw createHttpError(409, 'Subscription already exists.');
-    }
-  }
-
-  private async createNewSubscription(
-    email: string,
-    repository: { id: string; name: string },
-  ) {
-    try {
-      const subscription = await this.subscriptionRepository.create(
-        email,
-        repository.id,
-      );
-
-      await this.emailQueue.addEmail({
-        type: 'confirm-subscription',
-        email: subscription.email,
-        repoName: repository.name,
-        confirmToken: subscription.confirmToken,
-      });
-
-      return subscription;
-    } catch (error) {
-      if (error instanceof UniqueConstraintError) {
-        throw createHttpError(
-          409,
-          'Subscription is processing or already exists.',
-        );
-      }
-      throw error;
-    }
-  }
 
   async confirmSubscription(token: string) {
     const subscription =
