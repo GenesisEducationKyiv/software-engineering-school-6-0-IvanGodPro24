@@ -10,6 +10,7 @@ import {
 } from '@prisma/client';
 import { SubscriptionSagaOrchestrator } from '../modules/subscriptions/saga/subscription-saga.orchestrator.js';
 import { SubscriptionSagaRepository } from '../modules/subscriptions/saga/subscription-saga.repository.js';
+import { SubscriptionSagaCompensationService } from '../modules/subscriptions/saga/subscription-saga-compensation.service.js';
 import { IGitHubClient } from '../modules/github/github.service.js';
 import { IEmailQueue } from '../queue/email-queue.port.js';
 import { ILogger } from '@github-notifier/shared';
@@ -131,6 +132,10 @@ const mockSagaRepository = {
   markFailed: jest.fn(),
 } as unknown as jest.Mocked<SubscriptionSagaRepository>;
 
+const mockCompensationService = {
+  compensate: jest.fn(),
+} as unknown as jest.Mocked<SubscriptionSagaCompensationService>;
+
 const mockGithubClient = {
   checkRepoExists: jest.fn(),
   getLatestRelease: jest.fn(),
@@ -161,6 +166,7 @@ describe('SubscriptionSagaOrchestrator', () => {
     orchestrator = new SubscriptionSagaOrchestrator(
       mockPrisma as unknown as PrismaClient,
       mockSagaRepository,
+      mockCompensationService,
       mockGithubClient,
       mockEmailQueue,
       mockLogger,
@@ -447,7 +453,7 @@ describe('SubscriptionSagaOrchestrator', () => {
     });
   });
 
-  it('compensates by deleting newly created PENDING subscription if email command publishing fails', async () => {
+  it('delegates compensation if email command publishing fails for newly created subscription', async () => {
     mockGithubClient.checkRepoExists.mockResolvedValue(undefined);
 
     mockTx.repository.findUnique.mockResolvedValue(null);
@@ -478,27 +484,9 @@ describe('SubscriptionSagaOrchestrator', () => {
     });
 
     mockTx.subscriptionSaga.update.mockResolvedValue({});
-
+    mockSagaRepository.markEmailSendRequested.mockResolvedValue({} as never);
     mockEmailQueue.addEmail.mockRejectedValue(new Error('Redis unavailable'));
-
-    mockSagaRepository.findById.mockResolvedValue({
-      id: 'saga-1',
-      email: 'user@test.com',
-      repoName: 'facebook/react',
-      repositoryId: 'repo-1',
-      subscriptionId: 'sub-1',
-      createdRepository: true,
-      createdSubscription: true,
-      status: SubscriptionSagaStatus.EMAIL_SEND_REQUESTED,
-      currentStep: 'EMAIL_SEND_REQUESTED',
-      errorMessage: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    mockPrisma.subscription.deleteMany.mockResolvedValue({ count: 1 });
-    mockPrisma.subscription.count.mockResolvedValue(0);
-    mockPrisma.repository.deleteMany.mockResolvedValue({ count: 1 });
+    mockCompensationService.compensate.mockResolvedValue(undefined);
 
     await expect(
       orchestrator.start({
@@ -507,29 +495,13 @@ describe('SubscriptionSagaOrchestrator', () => {
       }),
     ).rejects.toThrow('Redis unavailable');
 
-    expect(mockSagaRepository.markCompensating).toHaveBeenCalledWith(
-      'saga-1',
-      'Redis unavailable',
-    );
-
-    expect(mockPrisma.subscription.deleteMany).toHaveBeenCalledWith({
-      where: {
-        id: 'sub-1',
-        status: SubscriptionStatus.PENDING,
-      },
-    });
-
-    expect(mockPrisma.repository.deleteMany).toHaveBeenCalledWith({
-      where: { id: 'repo-1' },
-    });
-
-    expect(mockSagaRepository.markCompensated).toHaveBeenCalledWith(
+    expect(mockCompensationService.compensate).toHaveBeenCalledWith(
       'saga-1',
       'Redis unavailable',
     );
   });
 
-  it('compensates by restoring UNSUBSCRIBED status if resubscribe email command publishing fails', async () => {
+  it('delegates compensation if email command publishing fails for resubscribe flow', async () => {
     mockGithubClient.checkRepoExists.mockResolvedValue(undefined);
 
     mockTx.repository.findUnique.mockResolvedValue({
@@ -565,25 +537,9 @@ describe('SubscriptionSagaOrchestrator', () => {
     });
 
     mockTx.subscriptionSaga.update.mockResolvedValue({});
-
+    mockSagaRepository.markEmailSendRequested.mockResolvedValue({} as never);
     mockEmailQueue.addEmail.mockRejectedValue(new Error('Redis unavailable'));
-
-    mockSagaRepository.findById.mockResolvedValue({
-      id: 'saga-1',
-      email: 'user@test.com',
-      repoName: 'facebook/react',
-      repositoryId: 'repo-1',
-      subscriptionId: 'sub-1',
-      createdRepository: false,
-      createdSubscription: false,
-      status: SubscriptionSagaStatus.EMAIL_SEND_REQUESTED,
-      currentStep: 'EMAIL_SEND_REQUESTED',
-      errorMessage: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    mockPrisma.subscription.updateMany.mockResolvedValue({ count: 1 });
+    mockCompensationService.compensate.mockResolvedValue(undefined);
 
     await expect(
       orchestrator.start({
@@ -592,17 +548,9 @@ describe('SubscriptionSagaOrchestrator', () => {
       }),
     ).rejects.toThrow('Redis unavailable');
 
-    expect(mockPrisma.subscription.updateMany).toHaveBeenCalledWith({
-      where: {
-        id: 'sub-1',
-        status: SubscriptionStatus.PENDING,
-      },
-      data: {
-        status: SubscriptionStatus.UNSUBSCRIBED,
-      },
-    });
-
-    expect(mockPrisma.subscription.deleteMany).not.toHaveBeenCalled();
-    expect(mockPrisma.repository.deleteMany).not.toHaveBeenCalled();
+    expect(mockCompensationService.compensate).toHaveBeenCalledWith(
+      'saga-1',
+      'Redis unavailable',
+    );
   });
 });

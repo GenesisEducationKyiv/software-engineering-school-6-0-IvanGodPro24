@@ -152,19 +152,19 @@ describe('Integration Tests: API Endpoints', () => {
 
       await seedSubscription(testEmail, testRepo, 'PENDING');
 
-      const savedSaga = await prisma.subscriptionSaga.findFirst({
-        where: { email: testEmail, repoName: testRepo },
-      });
-
-      expect(savedSaga).toBeNull();
-      expect(mockAddEmail).not.toHaveBeenCalled();
-
       const res = await request(app)
         .post('/api/subscribe')
         .send({ email: testEmail, repo: testRepo });
 
       expect(res.status).toBe(409);
       expect(res.body.data.message).toMatch(/Subscription is pending/i);
+
+      const savedSaga = await prisma.subscriptionSaga.findFirst({
+        where: { email: testEmail, repoName: testRepo },
+      });
+
+      expect(savedSaga).toBeNull();
+      expect(mockAddEmail).not.toHaveBeenCalled();
     });
 
     it('returns 409 if subscription is already ACTIVE', async () => {
@@ -175,19 +175,19 @@ describe('Integration Tests: API Endpoints', () => {
 
       await seedSubscription(testEmail, testRepo, 'ACTIVE');
 
-      const savedSaga = await prisma.subscriptionSaga.findFirst({
-        where: { email: testEmail, repoName: testRepo },
-      });
-
-      expect(savedSaga).toBeNull();
-      expect(mockAddEmail).not.toHaveBeenCalled();
-
       const res = await request(app)
         .post('/api/subscribe')
         .send({ email: testEmail, repo: testRepo });
 
       expect(res.status).toBe(409);
       expect(res.body.data.message).toMatch(/Already subscribed/i);
+
+      const savedSaga = await prisma.subscriptionSaga.findFirst({
+        where: { email: testEmail, repoName: testRepo },
+      });
+
+      expect(savedSaga).toBeNull();
+      expect(mockAddEmail).not.toHaveBeenCalled();
     });
 
     it('returns 202, updates status to PENDING and starts saga if UNSUBSCRIBED', async () => {
@@ -231,6 +231,46 @@ describe('Integration Tests: API Endpoints', () => {
         repoName: testRepo,
         confirmToken: updatedSub?.confirmToken,
       });
+    });
+
+    it('compensates subscription saga if email command publishing fails', async () => {
+      mockCheckRepoExists.mockResolvedValue(undefined);
+      mockAddEmail.mockRejectedValue(new Error('Redis unavailable'));
+
+      const testEmail = `test-${randomUUID()}@example.com`;
+      const testRepo = `test/repo-${randomUUID()}`;
+
+      const res = await request(app)
+        .post('/api/subscribe')
+        .send({ email: testEmail, repo: testRepo });
+
+      expect(res.status).toBe(500);
+
+      const savedRepo = await prisma.repository.findUnique({
+        where: { name: testRepo },
+      });
+
+      const savedSubscription = await prisma.subscription.findFirst({
+        where: { email: testEmail },
+      });
+
+      const savedSaga = await prisma.subscriptionSaga.findFirst({
+        where: { email: testEmail, repoName: testRepo },
+      });
+
+      expect(savedSubscription).toBeNull();
+
+      expect(savedSaga).not.toBeNull();
+      expect(savedSaga?.status).toBe('COMPENSATED');
+      expect(savedSaga?.errorMessage).toBe('Redis unavailable');
+
+      if (savedRepo) {
+        const repoSubscriptionsCount = await prisma.subscription.count({
+          where: { repositoryId: savedRepo.id },
+        });
+
+        expect(repoSubscriptionsCount).toBe(0);
+      }
     });
   });
 

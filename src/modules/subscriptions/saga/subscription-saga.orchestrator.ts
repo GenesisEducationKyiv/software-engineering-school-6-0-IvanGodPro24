@@ -10,6 +10,7 @@ import { EmailJobData } from '@github-notifier/notification-contracts';
 import { ILogger } from '@github-notifier/shared';
 import { IGitHubClient } from '../../github/github.service.js';
 import { GithubRepoId } from '../../repositories/github-repo-id.js';
+import { SubscriptionSagaCompensationService } from './subscription-saga-compensation.service.js';
 import { SubscriptionSagaRepository } from './subscription-saga.repository.js';
 
 export interface EmailCommandPublisher {
@@ -31,6 +32,7 @@ export class SubscriptionSagaOrchestrator {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly sagaRepository: SubscriptionSagaRepository,
+    private readonly compensationService: SubscriptionSagaCompensationService,
     private readonly githubClient: IGitHubClient,
     private readonly emailPublisher: EmailCommandPublisher,
     private readonly logger: ILogger,
@@ -166,7 +168,8 @@ export class SubscriptionSagaOrchestrator {
         'Subscription saga failed during start',
       );
 
-      if (sagaId) await this.compensateStartedSaga(sagaId, errorMessage);
+      if (sagaId)
+        await this.compensationService.compensate(sagaId, errorMessage);
 
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -180,48 +183,5 @@ export class SubscriptionSagaOrchestrator {
 
       throw error;
     }
-  }
-
-  private async compensateStartedSaga(sagaId: string, errorMessage: string) {
-    const saga = await this.sagaRepository.findById(sagaId);
-
-    if (!saga) return;
-
-    await this.sagaRepository.markCompensating(sagaId, errorMessage);
-
-    if (saga.subscriptionId) {
-      if (saga.createdSubscription) {
-        await this.prisma.subscription.deleteMany({
-          where: {
-            id: saga.subscriptionId,
-            status: SubscriptionStatus.PENDING,
-          },
-        });
-      } else {
-        await this.prisma.subscription.updateMany({
-          where: {
-            id: saga.subscriptionId,
-            status: SubscriptionStatus.PENDING,
-          },
-          data: {
-            status: SubscriptionStatus.UNSUBSCRIBED,
-          },
-        });
-      }
-    }
-
-    if (saga.createdRepository && saga.repositoryId) {
-      const subscriptionsCount = await this.prisma.subscription.count({
-        where: { repositoryId: saga.repositoryId },
-      });
-
-      if (subscriptionsCount === 0) {
-        await this.prisma.repository.deleteMany({
-          where: { id: saga.repositoryId },
-        });
-      }
-    }
-
-    await this.sagaRepository.markCompensated(sagaId, errorMessage);
   }
 }

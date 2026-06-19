@@ -13,6 +13,7 @@ import rootRouter from './routes/index.js';
 import { scannerService } from './containers/scanner.container.js';
 import { bullBoardRouter } from './queue/dashboard.js';
 import { swaggerDocs } from './infrastructure/swagger/swaggerDocs.js';
+import { notificationResultWorker } from './containers/notification-result.container.js';
 
 const logger = new PinoLogger('App');
 
@@ -35,6 +36,8 @@ app.use(errorHandler);
 if (process.env.NODE_ENV !== 'test') {
   logger.info('Scanner initialized');
   cron.schedule('*/10 * * * *', scannerService.scanRepositories);
+
+  notificationResultWorker.start();
 
   app.listen(PORT, () => {
     logger.info(`Server is running on ${URL}`);
