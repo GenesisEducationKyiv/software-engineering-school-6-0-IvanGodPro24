@@ -23,6 +23,7 @@ export class NotificationResultPublisher implements INotificationResultPublisher
 
   async publish(event: NotificationResultEvent): Promise<void> {
     await this.queue.add(event.type, event, {
+      jobId: `${event.type}-${event.sagaId}`,
       attempts: 3,
       backoff: { type: 'exponential', delay: 5000 },
     });

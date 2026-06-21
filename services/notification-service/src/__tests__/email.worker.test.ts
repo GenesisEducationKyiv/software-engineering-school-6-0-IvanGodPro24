@@ -2,14 +2,16 @@ import { jest } from '@jest/globals';
 import { Job } from 'bullmq';
 import { Redis } from 'ioredis';
 import { ILogger } from '@github-notifier/shared';
-import { EmailWorker } from '../email.worker.js';
+import { EmailWorker, EMAIL_SENT_PROGRESS } from '../email.worker.js';
 import { EmailJobHandler } from '../email-job.handler.js';
 import { INotificationResultPublisher } from '../notification-result.publisher.js';
 import { EmailJobData } from '@github-notifier/notification-contracts';
 
-type TestableEmailWorker = EmailWorker & {
-  processJob(job: Job<EmailJobData>): Promise<void>;
-};
+class TestableEmailWorker extends EmailWorker {
+  runJob(job: Job<EmailJobData>): Promise<void> {
+    return this.processJob(job);
+  }
+}
 
 const mockRedis = {} as Redis;
 
@@ -32,13 +34,21 @@ const createJob = (
   data: EmailJobData,
   attemptsMade = 0,
   attempts = 3,
-): Job<EmailJobData> =>
-  ({
+  initialProgress: string | number = 0,
+): Job<EmailJobData> => {
+  const job = {
     id: 'job-1',
     data,
     attemptsMade,
     opts: { attempts },
-  }) as Job<EmailJobData>;
+    progress: initialProgress,
+    updateProgress: jest.fn(async (progress: string | number) => {
+      job.progress = progress;
+    }),
+  };
+
+  return job as unknown as Job<EmailJobData>;
+};
 
 describe('EmailWorker result publishing', () => {
   let worker: TestableEmailWorker;
@@ -46,12 +56,12 @@ describe('EmailWorker result publishing', () => {
   beforeEach(() => {
     jest.resetAllMocks();
 
-    worker = new EmailWorker(
+    worker = new TestableEmailWorker(
       mockRedis,
       mockEmailJobHandler,
       mockNotificationResultPublisher,
       mockLogger,
-    ) as TestableEmailWorker;
+    );
   });
 
   it('publishes confirmation-email-sent after successful confirm-subscription email', async () => {
@@ -66,9 +76,10 @@ describe('EmailWorker result publishing', () => {
       confirmToken: 'confirm-token-123',
     });
 
-    await worker.processJob(job);
+    await worker.runJob(job);
 
     expect(mockEmailJobHandler.handle).toHaveBeenCalledWith(job.data);
+    expect(job.updateProgress).toHaveBeenCalledWith(EMAIL_SENT_PROGRESS);
 
     expect(mockNotificationResultPublisher.publish).toHaveBeenCalledWith({
       type: 'confirmation-email-sent',
@@ -90,8 +101,9 @@ describe('EmailWorker result publishing', () => {
       unsubscribeToken: 'unsubscribe-token-123',
     });
 
-    await worker.processJob(job);
+    await worker.runJob(job);
 
+    expect(job.updateProgress).not.toHaveBeenCalled();
     expect(mockEmailJobHandler.handle).toHaveBeenCalledWith(job.data);
     expect(mockNotificationResultPublisher.publish).not.toHaveBeenCalled();
   });
@@ -112,8 +124,9 @@ describe('EmailWorker result publishing', () => {
       3,
     );
 
-    await expect(worker.processJob(job)).rejects.toThrow('SMTP failed');
+    await expect(worker.runJob(job)).rejects.toThrow('SMTP failed');
 
+    expect(job.updateProgress).not.toHaveBeenCalled();
     expect(mockNotificationResultPublisher.publish).toHaveBeenCalledWith({
       type: 'confirmation-email-failed',
       sagaId: 'saga-1',
@@ -122,6 +135,110 @@ describe('EmailWorker result publishing', () => {
       repoName: 'facebook/react',
       errorMessage: 'SMTP failed',
     });
+  });
+
+  it('does not resend email when success result publishing is retried', async () => {
+    mockEmailJobHandler.handle.mockResolvedValue(undefined);
+
+    mockNotificationResultPublisher.publish
+      .mockRejectedValueOnce(new Error('Redis temporarily unavailable'))
+      .mockResolvedValueOnce(undefined);
+
+    const data: EmailJobData = {
+      type: 'confirm-subscription',
+      sagaId: 'saga-1',
+      subscriptionId: 'sub-1',
+      email: 'user@test.com',
+      repoName: 'facebook/react',
+      confirmToken: 'confirm-token-123',
+    };
+
+    const firstAttemptJob = createJob(data);
+
+    await expect(worker.runJob(firstAttemptJob)).rejects.toThrow(
+      'Redis temporarily unavailable',
+    );
+
+    expect(mockEmailJobHandler.handle).toHaveBeenCalledTimes(1);
+    expect(firstAttemptJob.progress).toBe(EMAIL_SENT_PROGRESS);
+
+    const retryJob = createJob(data, 1, 3, EMAIL_SENT_PROGRESS);
+
+    await worker.runJob(retryJob);
+
+    expect(retryJob.updateProgress).not.toHaveBeenCalled();
+    expect(mockEmailJobHandler.handle).toHaveBeenCalledTimes(1);
+    expect(mockNotificationResultPublisher.publish).toHaveBeenCalledTimes(2);
+    expect(mockNotificationResultPublisher.publish).toHaveBeenLastCalledWith({
+      type: 'confirmation-email-sent',
+      sagaId: 'saga-1',
+      subscriptionId: 'sub-1',
+      email: 'user@test.com',
+      repoName: 'facebook/react',
+    });
+  });
+
+  it('does not publish failure event when email was sent but success result publishing failed', async () => {
+    mockEmailJobHandler.handle.mockResolvedValue(undefined);
+    mockNotificationResultPublisher.publish.mockRejectedValue(
+      new Error('Redis unavailable'),
+    );
+
+    const job = createJob(
+      {
+        type: 'confirm-subscription',
+        sagaId: 'saga-1',
+        subscriptionId: 'sub-1',
+        email: 'user@test.com',
+        repoName: 'facebook/react',
+        confirmToken: 'confirm-token-123',
+      },
+      2,
+      3,
+    );
+
+    await expect(worker.runJob(job)).rejects.toThrow('Redis unavailable');
+
+    expect(mockNotificationResultPublisher.publish).toHaveBeenCalledTimes(1);
+    expect(mockNotificationResultPublisher.publish).toHaveBeenCalledWith({
+      type: 'confirmation-email-sent',
+      sagaId: 'saga-1',
+      subscriptionId: 'sub-1',
+      email: 'user@test.com',
+      repoName: 'facebook/react',
+    });
+  });
+
+  it('skips email sending when job is retried with email-sent progress', async () => {
+    mockNotificationResultPublisher.publish.mockResolvedValue(undefined);
+
+    const job = createJob(
+      {
+        type: 'confirm-subscription',
+        sagaId: 'saga-1',
+        subscriptionId: 'sub-1',
+        email: 'user@test.com',
+        repoName: 'facebook/react',
+        confirmToken: 'confirm-token-123',
+      },
+      1,
+      3,
+      EMAIL_SENT_PROGRESS,
+    );
+
+    await worker.runJob(job);
+
+    expect(mockEmailJobHandler.handle).not.toHaveBeenCalled();
+
+    expect(mockNotificationResultPublisher.publish).toHaveBeenCalledWith({
+      type: 'confirmation-email-sent',
+      sagaId: 'saga-1',
+      subscriptionId: 'sub-1',
+      email: 'user@test.com',
+      repoName: 'facebook/react',
+    });
+
+    expect(job.updateProgress).not.toHaveBeenCalled();
   });
 
   it('does not publish failed event before final attempt', async () => {
@@ -140,7 +257,7 @@ describe('EmailWorker result publishing', () => {
       3,
     );
 
-    await expect(worker.processJob(job)).rejects.toThrow('SMTP failed');
+    await expect(worker.runJob(job)).rejects.toThrow('SMTP failed');
 
     expect(mockNotificationResultPublisher.publish).not.toHaveBeenCalled();
   });

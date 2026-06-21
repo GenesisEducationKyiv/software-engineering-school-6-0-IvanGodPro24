@@ -8,6 +8,8 @@ import { ILogger } from '@github-notifier/shared';
 import { EmailJobHandler } from './email-job.handler.js';
 import { INotificationResultPublisher } from './notification-result.publisher.js';
 
+export const EMAIL_SENT_PROGRESS = 'email-sent';
+
 export class EmailWorker {
   private worker: Worker<EmailJobData> | null = null;
 
@@ -50,20 +52,30 @@ export class EmailWorker {
       'Processing email job',
     );
 
-    try {
+    if (data.type === 'new-release') {
       await this.emailJobHandler.handle(data);
+      return;
+    }
 
-      if (data.type === 'confirm-subscription') {
-        await this.notificationResultPublisher.publish({
-          type: 'confirmation-email-sent',
-          sagaId: data.sagaId,
-          subscriptionId: data.subscriptionId,
-          email: data.email,
-          repoName: data.repoName,
-        });
+    let emailSent = job.progress === EMAIL_SENT_PROGRESS;
+
+    try {
+      if (!emailSent) {
+        await this.emailJobHandler.handle(data);
+
+        emailSent = true;
+        await job.updateProgress(EMAIL_SENT_PROGRESS);
       }
+
+      await this.notificationResultPublisher.publish({
+        type: 'confirmation-email-sent',
+        sagaId: data.sagaId,
+        subscriptionId: data.subscriptionId,
+        email: data.email,
+        repoName: data.repoName,
+      });
     } catch (error) {
-      if (data.type === 'confirm-subscription' && this.isFinalAttempt(job)) {
+      if (!emailSent && this.isFinalAttempt(job)) {
         await this.notificationResultPublisher.publish({
           type: 'confirmation-email-failed',
           sagaId: data.sagaId,
