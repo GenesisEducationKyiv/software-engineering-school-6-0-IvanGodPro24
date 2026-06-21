@@ -43,7 +43,6 @@ enum SubscriptionSagaStatus {
   COMPLETED
   COMPENSATING
   COMPENSATED
-  FAILED
 }
 
 model SubscriptionSaga {

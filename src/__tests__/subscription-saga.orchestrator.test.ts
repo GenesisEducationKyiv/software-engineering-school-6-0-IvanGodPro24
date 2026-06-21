@@ -129,7 +129,6 @@ const mockSagaRepository = {
   markCompensating: jest.fn(),
   markCompensated: jest.fn(),
   markCompleted: jest.fn(),
-  markFailed: jest.fn(),
 } as unknown as jest.Mocked<SubscriptionSagaRepository>;
 
 const mockCompensationService = {

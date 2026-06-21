@@ -38,7 +38,7 @@ export class NotificationResultHandler {
       return;
     }
 
-    if (saga.status === 'COMPENSATED' || saga.status === 'FAILED') {
+    if (saga.status === 'COMPENSATED') {
       this.logger.warn(
         { sagaId, status: saga.status },
         'Email sent event ignored for finished saga',

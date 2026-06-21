@@ -77,17 +77,6 @@ export class SubscriptionSagaRepository {
     });
   }
 
-  async markFailed(sagaId: string, errorMessage: string) {
-    return this.prisma.subscriptionSaga.update({
-      where: { id: sagaId },
-      data: {
-        status: SubscriptionSagaStatus.FAILED,
-        currentStep: 'FAILED',
-        errorMessage,
-      },
-    });
-  }
-
   async findById(sagaId: string) {
     return this.prisma.subscriptionSaga.findUnique({
       where: { id: sagaId },
