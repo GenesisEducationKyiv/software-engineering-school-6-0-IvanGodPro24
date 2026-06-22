@@ -112,5 +112,9 @@ export class EmailWorker {
         'Job failed',
       );
     });
+
+    this.worker.on('error', (err) => {
+      this.logger.error({ err }, 'Email Worker error');
+    });
   }
 }

@@ -63,5 +63,9 @@ export class NotificationResultWorker {
         'Notification result event failed',
       );
     });
+
+    this.worker.on('error', (err) => {
+      this.logger.error({ err }, 'Notification Result Worker error');
+    });
   }
 }
