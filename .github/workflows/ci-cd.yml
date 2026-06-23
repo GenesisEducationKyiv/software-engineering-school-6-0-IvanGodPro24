@@ -7,7 +7,6 @@ on:
 
 env:
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-  SCANNER_DATABASE_URL: postgresql://scanner:scanner@localhost:5432/scanner_build
   REDIS_URL: redis://localhost:6379
   API_KEY: super-secret-key
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -76,6 +75,35 @@ jobs:
 
       - name: Run notification service tests
         run: npm run test:notification-service
+
+  github-scanner-service-tests:
+    name: GitHub Scanner Service Tests
+    runs-on: ubuntu-latest
+    needs: lint-and-build
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared packages
+        run: npm run build:packages
+
+      - name: Generate Scanner Prisma client
+        run: npm run db:generate:scanner
+        env:
+          SCANNER_DATABASE_URL: postgresql://scanner:scanner@localhost:5432/test
+
+      - name: Run GitHub scanner service tests
+        run: npm run test:github-scanner-service
 
   unit-tests:
     name: Unit Tests
@@ -166,7 +194,13 @@ jobs:
   cd:
     name: Deploy
     needs:
-      [unit-tests, integration-tests, e2e-tests, notification-service-tests]
+      [
+        unit-tests,
+        integration-tests,
+        e2e-tests,
+        notification-service-tests,
+        github-scanner-service-tests,
+      ]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
 

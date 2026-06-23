@@ -46,9 +46,12 @@ services:
     depends_on:
       test_scanner_db:
         condition: service_healthy
+      test_redis:
+        condition: service_started
     environment:
       SCANNER_SERVICE_REST_PORT: 3002
       SCANNER_DATABASE_URL: postgresql://scanner_test:scanner_test_password@test_scanner_db:5432/scanner_test_db?schema=public
+      REDIS_URL: redis://test_redis:6379
       GITHUB_API_TIMEOUT_MS: 5000
       GH_TOKEN: ${GH_TOKEN:-}
       NODE_ENV: production

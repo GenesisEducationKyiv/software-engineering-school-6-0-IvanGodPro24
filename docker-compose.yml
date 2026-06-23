@@ -91,10 +91,13 @@ services:
     depends_on:
       scanner_db:
         condition: service_healthy
+      redis:
+        condition: service_started
     env_file: .env
     environment:
       SCANNER_SERVICE_REST_PORT: 3002
       SCANNER_DATABASE_URL: postgresql://${SCANNER_POSTGRES_USER}:${SCANNER_POSTGRES_PASSWORD}@scanner_db:5432/${SCANNER_POSTGRES_DB}?schema=public
+      REDIS_URL: redis://redis:6379
       NODE_ENV: production
     ports:
       - '3002:3002'
