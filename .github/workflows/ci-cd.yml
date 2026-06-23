@@ -49,6 +49,9 @@ jobs:
       - name: Build notification service
         run: npm run build:notification-service
 
+      - name: Build GitHub scanner service
+        run: npm run build:github-scanner-service
+
   notification-service-tests:
     name: Notification Service Tests
     runs-on: ubuntu-latest
