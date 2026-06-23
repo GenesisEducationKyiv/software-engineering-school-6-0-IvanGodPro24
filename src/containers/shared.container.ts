@@ -8,6 +8,8 @@ import { GitHubClient } from '../modules/github/github.service.js';
 import { TrackedRepoRepository } from '../modules/repositories/tracked-repo.repository.js';
 import { SubscriptionRepository } from '../modules/subscriptions/subscription.repository.js';
 import { SubscriptionQueryRepository } from '../modules/subscriptions/subscription-query.repository.js';
+import { IRepositoryVerifier } from '../modules/github/repository-verifier.port.js';
+import { IReleaseProvider } from '../modules/github/release-provider.port.js';
 
 export const trackedRepoRepository = new TrackedRepoRepository(prisma);
 export const subscriptionRepository = new SubscriptionRepository(prisma);
@@ -30,4 +32,7 @@ const githubApi = axios.create({
   validateStatus: (status) => status === 200 || status === 304,
 });
 
-export const githubClient = new GitHubClient(cacheService, githubApi);
+const githubClient = new GitHubClient(cacheService, githubApi);
+
+export const repositoryVerifier: IRepositoryVerifier = githubClient;
+export const releaseProvider: IReleaseProvider = githubClient;

@@ -3,10 +3,10 @@ import createHttpError from 'http-errors';
 import request from 'supertest';
 import { randomUUID } from 'node:crypto';
 
-const mockCheckRepoExists = jest.fn<(...args: unknown[]) => Promise<void>>();
+const mockVerifyRepository = jest.fn<(...args: unknown[]) => Promise<void>>();
 jest.unstable_mockModule('../modules/github/github.service.js', () => ({
   GitHubClient: class {
-    checkRepoExists = mockCheckRepoExists;
+    verifyRepository = mockVerifyRepository;
     getLatestRelease = jest.fn();
   },
 }));
@@ -59,7 +59,7 @@ describe('Integration Tests: API Endpoints', () => {
 
   describe('POST /api/subscribe', () => {
     it('returns 202, creates saga, repository and subscription if the data is valid', async () => {
-      mockCheckRepoExists.mockResolvedValue(undefined);
+      mockVerifyRepository.mockResolvedValue(undefined);
 
       const testEmail = `test-${randomUUID()}@example.com`;
       const testRepo = `golang/go-${randomUUID()}`;
@@ -121,7 +121,7 @@ describe('Integration Tests: API Endpoints', () => {
     });
 
     it('returns 404 if repository does not exist on GitHub', async () => {
-      mockCheckRepoExists.mockRejectedValue(
+      mockVerifyRepository.mockRejectedValue(
         createHttpError(404, 'Repository not found'),
       );
 
@@ -145,7 +145,7 @@ describe('Integration Tests: API Endpoints', () => {
     });
 
     it('returns 409 if subscription is already PENDING', async () => {
-      mockCheckRepoExists.mockResolvedValue(undefined);
+      mockVerifyRepository.mockResolvedValue(undefined);
 
       const testEmail = `test-${randomUUID()}@example.com`;
       const testRepo = `test/repo-${randomUUID()}`;
@@ -168,7 +168,7 @@ describe('Integration Tests: API Endpoints', () => {
     });
 
     it('returns 409 if subscription is already ACTIVE', async () => {
-      mockCheckRepoExists.mockResolvedValue(undefined);
+      mockVerifyRepository.mockResolvedValue(undefined);
 
       const testEmail = `test-${randomUUID()}@example.com`;
       const testRepo = `test/repo-${randomUUID()}`;
@@ -191,7 +191,7 @@ describe('Integration Tests: API Endpoints', () => {
     });
 
     it('returns 202, updates status to PENDING and starts saga if UNSUBSCRIBED', async () => {
-      mockCheckRepoExists.mockResolvedValue(undefined);
+      mockVerifyRepository.mockResolvedValue(undefined);
 
       const testEmail = `test-${randomUUID()}@example.com`;
       const testRepo = `test/repo-${randomUUID()}`;
@@ -234,7 +234,7 @@ describe('Integration Tests: API Endpoints', () => {
     });
 
     it('compensates subscription saga if email command publishing fails', async () => {
-      mockCheckRepoExists.mockResolvedValue(undefined);
+      mockVerifyRepository.mockResolvedValue(undefined);
       mockAddEmail.mockRejectedValue(new Error('Redis unavailable'));
 
       const testEmail = `test-${randomUUID()}@example.com`;

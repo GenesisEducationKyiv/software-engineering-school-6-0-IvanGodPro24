@@ -1,21 +1,18 @@
 import axios, { AxiosInstance } from 'axios';
 import createHttpError from 'http-errors';
 import { ICacheService } from '../../infrastructure/cache/cache.service.js';
+import { IRepositoryVerifier } from './repository-verifier.port.js';
+import { IReleaseProvider } from './release-provider.port.js';
 
-export interface IGitHubClient {
-  checkRepoExists(owner: string, repo: string): Promise<void>;
-  getLatestRelease(owner: string, repo: string): Promise<string | null>;
-}
-
-export class GitHubClient implements IGitHubClient {
+export class GitHubClient implements IRepositoryVerifier, IReleaseProvider {
   constructor(
     private readonly cacheService: ICacheService,
     private readonly githubApi: AxiosInstance,
   ) {}
 
-  async checkRepoExists(owner: string, repo: string): Promise<void> {
+  async verifyRepository(owner: string, repository: string): Promise<void> {
     try {
-      await this.githubApi.get(`/repos/${owner}/${repo}`);
+      await this.githubApi.get(`/repos/${owner}/${repository}`);
     } catch (error) {
       this.handleGitHubError(error);
     }

@@ -5,7 +5,7 @@ import { emailQueue } from '../queue/email.queue.js';
 import {
   trackedRepoRepository,
   subscriptionQueryRepository,
-  githubClient,
+  releaseProvider,
 } from './shared.container.js';
 
 const scannerLogger = new PinoLogger('Scanner');
@@ -14,7 +14,7 @@ const emailQueueAdapter = new EmailQueueAdapter(emailQueue);
 export const scannerService = new ScannerService(
   trackedRepoRepository,
   subscriptionQueryRepository,
-  githubClient,
+  releaseProvider,
   emailQueueAdapter,
   scannerLogger,
 );

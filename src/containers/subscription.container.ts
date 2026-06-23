@@ -7,7 +7,7 @@ import { SubscriptionSagaCompensationService } from '../modules/subscriptions/sa
 import { SubscriptionSagaOrchestrator } from '../modules/subscriptions/saga/subscription-saga.orchestrator.js';
 import {
   subscriptionRepository,
-  githubClient,
+  repositoryVerifier,
   subscriptionQueryRepository,
 } from './shared.container.js';
 import { EmailQueueAdapter } from '../queue/email-queue.adapter.js';
@@ -29,7 +29,7 @@ export const subscriptionSagaOrchestrator = new SubscriptionSagaOrchestrator(
   prisma,
   subscriptionSagaRepository,
   subscriptionSagaCompensationService,
-  githubClient,
+  repositoryVerifier,
   emailQueueAdapter,
   sagaLogger,
 );

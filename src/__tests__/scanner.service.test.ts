@@ -1,11 +1,9 @@
 import { jest } from '@jest/globals';
-import {
-  ScannerService,
-} from '../modules/scanner/scanner.service.js';
+import { ScannerService } from '../modules/scanner/scanner.service.js';
 import { IEmailQueue } from '../queue/email-queue.port.js';
 import { ITrackedRepoRepository } from '../modules/repositories/tracked-repo.repository.js';
 import { ISubscriptionQueryRepository } from '../modules/subscriptions/subscription-query.repository.js';
-import { IGitHubClient } from '../modules/github/github.service.js';
+import { IReleaseProvider } from '../modules/github/release-provider.port.js';
 import { ILogger } from '@github-notifier/shared';
 import { SubscriptionEntity } from '../modules/subscriptions/subscription.entity.js';
 import { TrackedRepoEntity } from '../modules/repositories/tracked-repo.entity.js';
@@ -21,11 +19,11 @@ describe('scanner.service', () => {
   const mockSubscriptionQueryRepository = {
     findByEmailAndStatusWithRepo: jest.fn(),
     findByRepoIdAndStatus: jest.fn(),
-  } as unknown as jest.Mocked<ISubscriptionQueryRepository>;
+  } as jest.Mocked<ISubscriptionQueryRepository>;
 
-  const mockGithubClient = {
+  const mockReleaseProvider = {
     getLatestRelease: jest.fn(),
-  } as unknown as jest.Mocked<IGitHubClient>;
+  } as jest.Mocked<IReleaseProvider>;
 
   const mockEmailQueue = {
     addEmail: jest.fn(),
@@ -44,7 +42,7 @@ describe('scanner.service', () => {
     scannerService = new ScannerService(
       mockRepoRepository,
       mockSubscriptionQueryRepository,
-      mockGithubClient,
+      mockReleaseProvider,
       mockEmailQueue,
       mockLogger,
     );
@@ -55,7 +53,7 @@ describe('scanner.service', () => {
 
     await scannerService.scanRepositories();
 
-    expect(mockGithubClient.getLatestRelease).not.toHaveBeenCalled();
+    expect(mockReleaseProvider.getLatestRelease).not.toHaveBeenCalled();
     expect(mockEmailQueue.addBulkEmails).not.toHaveBeenCalled();
   });
 
@@ -67,7 +65,7 @@ describe('scanner.service', () => {
         lastSeenTag: null,
       } as TrackedRepoEntity,
     ]);
-    mockGithubClient.getLatestRelease.mockResolvedValue('v18.2.0');
+    mockReleaseProvider.getLatestRelease.mockResolvedValue('v18.2.0');
 
     await scannerService.scanRepositories();
 
@@ -89,7 +87,7 @@ describe('scanner.service', () => {
         lastSeenTag: 'v18.2.0',
       } as TrackedRepoEntity,
     ]);
-    mockGithubClient.getLatestRelease.mockResolvedValue('v18.2.0');
+    mockReleaseProvider.getLatestRelease.mockResolvedValue('v18.2.0');
 
     await scannerService.scanRepositories();
 
@@ -105,7 +103,7 @@ describe('scanner.service', () => {
         lastSeenTag: 'v18.2.0',
       } as TrackedRepoEntity,
     ]);
-    mockGithubClient.getLatestRelease.mockResolvedValue('v19.0.0');
+    mockReleaseProvider.getLatestRelease.mockResolvedValue('v19.0.0');
 
     mockSubscriptionQueryRepository.findByRepoIdAndStatus.mockResolvedValue([
       {
@@ -156,7 +154,7 @@ describe('scanner.service', () => {
       } as TrackedRepoEntity,
     ]);
 
-    mockGithubClient.getLatestRelease
+    mockReleaseProvider.getLatestRelease
       .mockRejectedValueOnce(new Error('GitHub API Error'))
       .mockResolvedValueOnce('v2.0');
 

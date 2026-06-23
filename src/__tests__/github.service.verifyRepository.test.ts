@@ -3,7 +3,7 @@ import { ICacheService } from '../infrastructure/cache/cache.service.js';
 import { GitHubClient } from '../modules/github/github.service.js';
 import { AxiosInstance } from 'axios';
 
-describe('github.service - checkRepoExists', () => {
+describe('github.service - verifyRepository', () => {
   let githubClient: GitHubClient;
 
   const mockCacheService = {
@@ -38,7 +38,7 @@ describe('github.service - checkRepoExists', () => {
     mockAxiosGet.mockResolvedValue({ status: 200 });
 
     await expect(
-      githubClient.checkRepoExists('golang', 'go'),
+      githubClient.verifyRepository('golang', 'go'),
     ).resolves.toBeUndefined();
   });
 
@@ -46,7 +46,7 @@ describe('github.service - checkRepoExists', () => {
     mockAxiosGet.mockRejectedValue(createAxiosError(404));
 
     await expect(
-      githubClient.checkRepoExists('bad', 'repo'),
+      githubClient.verifyRepository('bad', 'repo'),
     ).rejects.toMatchObject({
       status: 404,
     });
@@ -58,7 +58,7 @@ describe('github.service - checkRepoExists', () => {
     );
 
     await expect(
-      githubClient.checkRepoExists('golang', 'go'),
+      githubClient.verifyRepository('golang', 'go'),
     ).rejects.toMatchObject({
       status: 429,
     });

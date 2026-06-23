@@ -11,7 +11,7 @@ import {
 import { SubscriptionSagaOrchestrator } from '../modules/subscriptions/saga/subscription-saga.orchestrator.js';
 import { SubscriptionSagaRepository } from '../modules/subscriptions/saga/subscription-saga.repository.js';
 import { SubscriptionSagaCompensationService } from '../modules/subscriptions/saga/subscription-saga-compensation.service.js';
-import { IGitHubClient } from '../modules/github/github.service.js';
+import { IRepositoryVerifier } from '../modules/github/repository-verifier.port.js';
 import { IEmailQueue } from '../queue/email-queue.port.js';
 import { ILogger } from '@github-notifier/shared';
 
@@ -135,10 +135,9 @@ const mockCompensationService = {
   compensate: jest.fn(),
 } as unknown as jest.Mocked<SubscriptionSagaCompensationService>;
 
-const mockGithubClient = {
-  checkRepoExists: jest.fn(),
-  getLatestRelease: jest.fn(),
-} as jest.Mocked<IGitHubClient>;
+const mockRepositoryVerifier = {
+  verifyRepository: jest.fn(),
+} as jest.Mocked<IRepositoryVerifier>;
 
 const mockEmailQueue = {
   addEmail: jest.fn(),
@@ -166,14 +165,14 @@ describe('SubscriptionSagaOrchestrator', () => {
       mockPrisma as unknown as PrismaClient,
       mockSagaRepository,
       mockCompensationService,
-      mockGithubClient,
+      mockRepositoryVerifier,
       mockEmailQueue,
       mockLogger,
     );
   });
 
   it('starts saga, creates repository and subscription, then publishes confirmation email command', async () => {
-    mockGithubClient.checkRepoExists.mockResolvedValue(undefined);
+    mockRepositoryVerifier.verifyRepository.mockResolvedValue(undefined);
 
     mockTx.repository.findUnique.mockResolvedValue(null);
     mockTx.repository.create.mockResolvedValue({
@@ -210,7 +209,7 @@ describe('SubscriptionSagaOrchestrator', () => {
       repoName: 'facebook/react',
     });
 
-    expect(mockGithubClient.checkRepoExists).toHaveBeenCalledWith(
+    expect(mockRepositoryVerifier.verifyRepository).toHaveBeenCalledWith(
       'facebook',
       'react',
     );
@@ -268,7 +267,7 @@ describe('SubscriptionSagaOrchestrator', () => {
   });
 
   it('throws 409 if subscription is already ACTIVE', async () => {
-    mockGithubClient.checkRepoExists.mockResolvedValue(undefined);
+    mockRepositoryVerifier.verifyRepository.mockResolvedValue(undefined);
 
     mockTx.repository.findUnique.mockResolvedValue({
       id: 'repo-1',
@@ -296,7 +295,7 @@ describe('SubscriptionSagaOrchestrator', () => {
   });
 
   it('throws 409 if subscription is already PENDING', async () => {
-    mockGithubClient.checkRepoExists.mockResolvedValue(undefined);
+    mockRepositoryVerifier.verifyRepository.mockResolvedValue(undefined);
 
     mockTx.repository.findUnique.mockResolvedValue({
       id: 'repo-1',
@@ -324,7 +323,7 @@ describe('SubscriptionSagaOrchestrator', () => {
   });
 
   it('throws 409 if Prisma unique constraint error happens during subscription creation', async () => {
-    mockGithubClient.checkRepoExists.mockResolvedValue(undefined);
+    mockRepositoryVerifier.verifyRepository.mockResolvedValue(undefined);
 
     mockTx.repository.findUnique.mockResolvedValue({
       id: 'repo-1',
@@ -371,7 +370,7 @@ describe('SubscriptionSagaOrchestrator', () => {
   });
 
   it('resubscribes UNSUBSCRIBED subscription and publishes confirmation email command', async () => {
-    mockGithubClient.checkRepoExists.mockResolvedValue(undefined);
+    mockRepositoryVerifier.verifyRepository.mockResolvedValue(undefined);
 
     mockTx.repository.findUnique.mockResolvedValue({
       id: 'repo-1',
@@ -453,7 +452,7 @@ describe('SubscriptionSagaOrchestrator', () => {
   });
 
   it('delegates compensation if email command publishing fails for newly created subscription', async () => {
-    mockGithubClient.checkRepoExists.mockResolvedValue(undefined);
+    mockRepositoryVerifier.verifyRepository.mockResolvedValue(undefined);
 
     mockTx.repository.findUnique.mockResolvedValue(null);
     mockTx.repository.create.mockResolvedValue({
@@ -501,7 +500,7 @@ describe('SubscriptionSagaOrchestrator', () => {
   });
 
   it('delegates compensation if email command publishing fails for resubscribe flow', async () => {
-    mockGithubClient.checkRepoExists.mockResolvedValue(undefined);
+    mockRepositoryVerifier.verifyRepository.mockResolvedValue(undefined);
 
     mockTx.repository.findUnique.mockResolvedValue({
       id: 'repo-1',

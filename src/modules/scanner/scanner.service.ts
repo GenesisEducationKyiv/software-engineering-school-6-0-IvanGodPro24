@@ -1,7 +1,7 @@
 import { ILogger } from '@github-notifier/shared';
 import { ITrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
 import { ISubscriptionQueryRepository } from '../subscriptions/subscription-query.repository.js';
-import { IGitHubClient } from '../github/github.service.js';
+import { IReleaseProvider } from '../github/release-provider.port.js';
 import { GithubRepoId } from '../repositories/github-repo-id.js';
 import { IEmailQueue } from '../../queue/email-queue.port.js';
 
@@ -9,7 +9,7 @@ export class ScannerService {
   constructor(
     private readonly repoRepository: ITrackedRepoRepository,
     private readonly subscriptionQueryRepository: ISubscriptionQueryRepository,
-    private readonly githubClient: IGitHubClient,
+    private readonly releaseProvider: IReleaseProvider,
     private readonly emailQueue: IEmailQueue,
     private readonly logger: ILogger,
   ) {}
@@ -25,7 +25,7 @@ export class ScannerService {
         const repoId = new GithubRepoId(repo.name);
 
         try {
-          const latestTag = await this.githubClient.getLatestRelease(
+          const latestTag = await this.releaseProvider.getLatestRelease(
             repoId.owner,
             repoId.name,
           );
