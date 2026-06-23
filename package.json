@@ -13,7 +13,7 @@
     "build": "npm run db:generate && npm run build-docs && tsc",
     "build:packages": "npm run build -w @github-notifier/shared -w @github-notifier/notification-contracts -w @github-notifier/scanner-contracts",
     "build:notification-service": "npm run build -w notification-service",
-    "build:github-scanner-service": "npm run build -w github-scanner-service",
+    "build:github-scanner-service": "npm run db:generate:scanner && npm run build -w github-scanner-service",
     "build:all": "npm run build:packages && npm run build && npm run build:notification-service && npm run build:github-scanner-service",
     "lint": "eslint .",
     "start": "node dist/src/index.js",
@@ -28,6 +28,9 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:generate": "prisma generate",
+    "db:generate:scanner": "prisma generate --config services/github-scanner-service/prisma.config.ts",
+    "db:migrate:scanner": "prisma migrate deploy --config services/github-scanner-service/prisma.config.ts",
+    "db:migrate:dev:scanner": "prisma migrate dev --config services/github-scanner-service/prisma.config.ts",
     "predev": "npm run build-docs",
     "build-docs": "redocly bundle docs/openapi.yaml --ext json -o docs/swagger.json",
     "preview-docs": "redocly preview"

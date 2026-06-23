@@ -26,10 +26,11 @@ COPY services/github-scanner-service ./services/github-scanner-service
 
 RUN npm run build -w @github-notifier/shared
 RUN npm run build -w @github-notifier/scanner-contracts
-RUN npm run build -w github-scanner-service
+RUN SCANNER_DATABASE_URL="postgresql://scanner:scanner@localhost:5432/build" \
+    npm run build:github-scanner-service
 
-WORKDIR /app/services/github-scanner-service
+WORKDIR /app
 
 EXPOSE 3002
 
-CMD ["node", "dist/index.js"]
+CMD ["sh", "-c", "npm run db:migrate:scanner && npm run start -w github-scanner-service"]

@@ -60,15 +60,41 @@ services:
         gelf-address: 'udp://127.0.0.1:12201'
         tag: 'notification-service'
 
+  scanner_db:
+    image: postgres:15-alpine
+    container_name: github_notifier_scanner_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${SCANNER_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SCANNER_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${SCANNER_POSTGRES_DB}
+    ports:
+      - '5435:5432'
+    volumes:
+      - scanner_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${SCANNER_POSTGRES_USER} -d ${SCANNER_POSTGRES_DB}',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   github-scanner-service:
     build:
       context: .
       dockerfile: services/github-scanner-service/Dockerfile
     container_name: github_notifier_github_scanner_service
     restart: unless-stopped
+    depends_on:
+      scanner_db:
+        condition: service_healthy
     env_file: .env
     environment:
       SCANNER_SERVICE_REST_PORT: 3002
+      SCANNER_DATABASE_URL: postgresql://${SCANNER_POSTGRES_USER}:${SCANNER_POSTGRES_PASSWORD}@scanner_db:5432/${SCANNER_POSTGRES_DB}?schema=public
       NODE_ENV: production
     ports:
       - '3002:3002'
@@ -133,4 +159,5 @@ services:
 
 volumes:
   pgdata:
+  scanner_pgdata:
   esdata:

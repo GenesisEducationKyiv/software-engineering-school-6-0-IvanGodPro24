@@ -12,12 +12,16 @@
   "dependencies": {
     "@github-notifier/scanner-contracts": "1.0.0",
     "@github-notifier/shared": "1.0.0",
+    "@prisma/adapter-pg": "^7.7.0",
+    "@prisma/client": "^7.7.0",
+    "pg": "^8.20.0",
     "axios": "^1.14.0",
     "express": "^5.2.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^25.9.1",
+    "@types/pg": "^8.20.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2"
   }

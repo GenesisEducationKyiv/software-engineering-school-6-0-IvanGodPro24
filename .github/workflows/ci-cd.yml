@@ -7,6 +7,7 @@ on:
 
 env:
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+  SCANNER_DATABASE_URL: postgresql://scanner:scanner@localhost:5432/scanner_build
   REDIS_URL: redis://localhost:6379
   API_KEY: super-secret-key
   GH_TOKEN: ${{ secrets.GH_TOKEN }}

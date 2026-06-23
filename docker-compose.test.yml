@@ -21,6 +21,21 @@ services:
     ports:
       - '1025:1025'
 
+  test_scanner_db:
+    profiles:
+      - e2e
+    image: postgres:15-alpine
+    container_name: github_notifier_test_scanner_db
+    environment:
+      POSTGRES_USER: scanner_test
+      POSTGRES_PASSWORD: scanner_test_password
+      POSTGRES_DB: scanner_test_db
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U scanner_test -d scanner_test_db']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
   test_scanner:
     profiles:
       - e2e
@@ -28,8 +43,12 @@ services:
       context: .
       dockerfile: services/github-scanner-service/Dockerfile
     container_name: github_notifier_test_scanner
+    depends_on:
+      test_scanner_db:
+        condition: service_healthy
     environment:
       SCANNER_SERVICE_REST_PORT: 3002
+      SCANNER_DATABASE_URL: postgresql://scanner_test:scanner_test_password@test_scanner_db:5432/scanner_test_db?schema=public
       GITHUB_API_TIMEOUT_MS: 5000
       GH_TOKEN: ${GH_TOKEN:-}
       NODE_ENV: production
