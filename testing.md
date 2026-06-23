@@ -31,12 +31,12 @@ npx playwright install --with-deps chromium
 
 ## Test Commands
 
-| Command | Purpose |
-|---|---|
-| `npm run test:unit` | Runs Jest unit tests only. |
+| Command                    | Purpose                                                               |
+| -------------------------- | --------------------------------------------------------------------- |
+| `npm run test:unit`        | Runs Jest unit tests only.                                            |
 | `npm run test:integration` | Starts test services, applies migrations, and runs integration tests. |
-| `npm run test:e2e` | Starts test services, builds the app, and runs Playwright tests. |
-| `npm test` | Runs unit, integration, and E2E tests in sequence. |
+| `npm run test:e2e`         | Starts test services, builds the app, and runs Playwright tests.      |
+| `npm test`                 | Runs unit, integration, and E2E tests in sequence.                    |
 
 ---
 
@@ -133,11 +133,11 @@ npx playwright show-report
 
 The local test infrastructure is defined in `docker-compose.test.yml`.
 
-| Service | Container | Port |
-|---|---|---|
-| PostgreSQL | `github_notifier_test_db` | `localhost:5434` |
-| Redis | `github_notifier_test_redis` | `localhost:6380` |
-| MailHog SMTP | `github_notifier_test_smtp` | `localhost:1025` |
+| Service      | Container                    | Port             |
+| ------------ | ---------------------------- | ---------------- |
+| PostgreSQL   | `github_notifier_test_db`    | `localhost:5434` |
+| Redis        | `github_notifier_test_redis` | `localhost:6380` |
+| MailHog SMTP | `github_notifier_test_smtp`  | `localhost:1025` |
 
 The integration and E2E scripts automatically clean up containers and volumes after execution using Bash `trap EXIT`.
 Even if a script is interrupted or fails due to a broken test, all test Docker infrastructure is completely wiped out, leaving your local environment clean.
