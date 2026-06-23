@@ -42,6 +42,7 @@ for attempt in {1..30}; do
 done
 
 export DATABASE_URL="postgresql://test_user:test_password@localhost:5434/test_db?schema=public"
+export REDIS_URL="redis://localhost:6380"
 export SMTP_HOST="localhost"
 export SMTP_PORT="1025"
 export SCANNER_SERVICE_REST_URL="http://localhost:3002"
