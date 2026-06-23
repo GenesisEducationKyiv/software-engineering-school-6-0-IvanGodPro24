@@ -1,7 +1,31 @@
+import axios from 'axios';
 import { getEnvVar, PinoLogger } from '@github-notifier/shared';
-import { app } from './app.js';
+import { createApp } from './app.js';
+import { GitHubRepositoryClient } from './github/github.client.js';
+import { RepositoryVerificationService } from './app/repository-verification.service.js';
 
 const logger = new PinoLogger('GitHubScannerService');
+
+const githubToken = getEnvVar('GH_TOKEN', '');
+
+const githubApi = axios.create({
+  baseURL: 'https://api.github.com',
+  headers: {
+    Accept: 'application/vnd.github.v3+json',
+    ...(githubToken && {
+      Authorization: `Bearer ${githubToken}`,
+    }),
+  },
+  timeout: Number(getEnvVar('GITHUB_API_TIMEOUT_MS', '5000')),
+});
+
+const githubClient = new GitHubRepositoryClient(githubApi);
+
+const repositoryVerificationService = new RepositoryVerificationService(
+  githubClient,
+);
+
+const app = createApp(repositoryVerificationService, logger);
 
 const PORT = Number(getEnvVar('SCANNER_SERVICE_REST_PORT', '3002'));
 
