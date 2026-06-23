@@ -5,6 +5,7 @@ WORKDIR /app
 COPY package*.json ./
 COPY packages/shared/package.json ./packages/shared/package.json
 COPY packages/notification-contracts/package.json ./packages/notification-contracts/package.json
+COPY packages/scanner-contracts/package.json ./packages/scanner-contracts/package.json
 COPY services/notification-service/package.json ./services/notification-service/package.json
 COPY services/github-scanner-service/package.json ./services/github-scanner-service/package.json
 

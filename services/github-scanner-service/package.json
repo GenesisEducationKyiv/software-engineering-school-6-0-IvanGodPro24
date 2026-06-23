@@ -10,6 +10,7 @@
     "dev": "tsx watch src/index.ts"
   },
   "dependencies": {
+    "@github-notifier/scanner-contracts": "1.0.0",
     "@github-notifier/shared": "1.0.0",
     "axios": "^1.14.0",
     "express": "^5.2.1"

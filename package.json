@@ -11,7 +11,7 @@
   "type": "module",
   "scripts": {
     "build": "npm run db:generate && npm run build-docs && tsc",
-    "build:packages": "npm run build -w @github-notifier/shared -w @github-notifier/notification-contracts",
+    "build:packages": "npm run build -w @github-notifier/shared -w @github-notifier/notification-contracts -w @github-notifier/scanner-contracts",
     "build:notification-service": "npm run build -w notification-service",
     "build:github-scanner-service": "npm run build -w github-scanner-service",
     "build:all": "npm run build:packages && npm run build && npm run build:notification-service && npm run build:github-scanner-service",
@@ -46,6 +46,7 @@
   "dependencies": {
     "@github-notifier/notification-contracts": "1.0.0",
     "@github-notifier/shared": "1.0.0",
+    "@github-notifier/scanner-contracts": "1.0.0",
     "@bull-board/api": "^6.21.0",
     "@bull-board/express": "^6.21.0",
     "@prisma/adapter-pg": "^7.7.0",
