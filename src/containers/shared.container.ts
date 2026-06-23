@@ -10,6 +10,7 @@ import { SubscriptionRepository } from '../modules/subscriptions/subscription.re
 import { SubscriptionQueryRepository } from '../modules/subscriptions/subscription-query.repository.js';
 import { IRepositoryVerifier } from '../modules/github/repository-verifier.port.js';
 import { IReleaseProvider } from '../modules/github/release-provider.port.js';
+import { RestRepositoryVerifier } from '../infrastructure/scanner/rest-repository-verifier.js';
 
 export const trackedRepoRepository = new TrackedRepoRepository(prisma);
 export const subscriptionRepository = new SubscriptionRepository(prisma);
@@ -34,5 +35,12 @@ const githubApi = axios.create({
 
 const githubClient = new GitHubClient(cacheService, githubApi);
 
-export const repositoryVerifier: IRepositoryVerifier = githubClient;
 export const releaseProvider: IReleaseProvider = githubClient;
+
+const scannerRestApi = axios.create({
+  baseURL: getEnvVar('SCANNER_SERVICE_REST_URL', 'http://localhost:3002'),
+  timeout: Number(getEnvVar('SCANNER_SERVICE_REST_TIMEOUT_MS', '3000')),
+});
+
+export const repositoryVerifier: IRepositoryVerifier =
+  new RestRepositoryVerifier(scannerRestApi);

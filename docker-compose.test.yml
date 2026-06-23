@@ -20,3 +20,18 @@ services:
     container_name: github_notifier_test_smtp
     ports:
       - '1025:1025'
+
+  test_scanner:
+    profiles:
+      - e2e
+    build:
+      context: .
+      dockerfile: services/github-scanner-service/Dockerfile
+    container_name: github_notifier_test_scanner
+    environment:
+      SCANNER_SERVICE_REST_PORT: 3002
+      GITHUB_API_TIMEOUT_MS: 5000
+      GH_TOKEN: ${GH_TOKEN:-}
+      NODE_ENV: production
+    ports:
+      - '3002:3002'

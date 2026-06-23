@@ -4,12 +4,14 @@ import request from 'supertest';
 import { randomUUID } from 'node:crypto';
 
 const mockVerifyRepository = jest.fn<(...args: unknown[]) => Promise<void>>();
-jest.unstable_mockModule('../modules/github/github.service.js', () => ({
-  GitHubClient: class {
-    verifyRepository = mockVerifyRepository;
-    getLatestRelease = jest.fn();
-  },
-}));
+jest.unstable_mockModule(
+  '../infrastructure/scanner/rest-repository-verifier.js',
+  () => ({
+    RestRepositoryVerifier: class {
+      verifyRepository = mockVerifyRepository;
+    },
+  }),
+);
 
 const mockAddEmail = jest.fn<(...args: unknown[]) => Promise<void>>();
 const mockAddBulkEmails = jest.fn<(...args: unknown[]) => Promise<void>>();
