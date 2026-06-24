@@ -1,14 +1,16 @@
 import createHttpError from 'http-errors';
 import { ISubscriptionRepository } from './subscription.repository.js';
 import { ISubscriptionQueryRepository } from './subscription-query.repository.js';
+import { IScannerCommandPublisher } from '../../queue/scanner-command-queue.port.js';
 
 export class SubscriptionService {
   constructor(
     private readonly subscriptionRepository: ISubscriptionRepository,
     private readonly subscriptionQueryRepository: ISubscriptionQueryRepository,
+    private readonly scannerCommandPublisher: IScannerCommandPublisher,
   ) {}
 
-  async confirmSubscription(token: string) {
+  async confirmSubscription(token: string): Promise<void> {
     const subscription =
       await this.subscriptionRepository.findByConfirmToken(token);
 
@@ -18,9 +20,11 @@ export class SubscriptionService {
       throw createHttpError(400, 'Subscription already confirmed');
 
     await this.subscriptionRepository.updateStatus(subscription.id, 'ACTIVE');
+
+    await this.syncRepositoryTracking(subscription.repositoryId);
   }
 
-  async cancelSubscription(token: string) {
+  async cancelSubscription(token: string): Promise<void> {
     const subscription =
       await this.subscriptionRepository.findByUnsubscribeToken(token);
 
@@ -33,6 +37,8 @@ export class SubscriptionService {
       subscription.id,
       'UNSUBSCRIBED',
     );
+
+    await this.syncRepositoryTracking(subscription.repositoryId);
   }
 
   async getSubscriptionsByEmail(email: string) {
@@ -48,5 +54,28 @@ export class SubscriptionService {
       confirmed: status === 'ACTIVE',
       last_seen_tag: repository.lastSeenTag,
     }));
+  }
+
+  private async syncRepositoryTracking(repositoryId: string): Promise<void> {
+    const [repository, activeSubscriptionsCount] = await Promise.all([
+      this.subscriptionQueryRepository.findRepositoryById(repositoryId),
+      this.subscriptionQueryRepository.countByRepoIdAndStatus(
+        repositoryId,
+        'ACTIVE',
+      ),
+    ]);
+
+    if (!repository)
+      throw createHttpError(
+        500,
+        'Repository associated with subscription was not found',
+      );
+
+    await this.scannerCommandPublisher.publish({
+      type: 'sync-repository-tracking',
+      repositoryId: repository.id,
+      repoName: repository.name,
+      active: activeSubscriptionsCount > 0,
+    });
   }
 }

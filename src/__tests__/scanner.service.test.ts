@@ -19,6 +19,8 @@ describe('scanner.service', () => {
   const mockSubscriptionQueryRepository = {
     findByEmailAndStatusWithRepo: jest.fn(),
     findByRepoIdAndStatus: jest.fn(),
+    findRepositoryById: jest.fn(),
+    countByRepoIdAndStatus: jest.fn(),
   } as jest.Mocked<ISubscriptionQueryRepository>;
 
   const mockReleaseProvider = {

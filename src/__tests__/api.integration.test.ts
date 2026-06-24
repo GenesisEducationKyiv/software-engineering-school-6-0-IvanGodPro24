@@ -26,6 +26,8 @@ const { app } = await import('../index.js');
 const { prisma } = await import('../infrastructure/db/client.js');
 const { redis } = await import('../infrastructure/redis/redis.js');
 const { emailQueue } = await import('../queue/email.queue.js');
+const { scannerCommandQueue } =
+  await import('../queue/scanner-command.queue.js');
 
 async function seedSubscription(
   email: string,
@@ -56,6 +58,7 @@ describe('Integration Tests: API Endpoints', () => {
   afterAll(async () => {
     await prisma.$disconnect();
     await emailQueue.close();
+    await scannerCommandQueue.close();
     await redis.quit();
   });
 
