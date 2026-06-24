@@ -8,6 +8,7 @@ on:
 env:
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
   REDIS_URL: redis://localhost:6379
+  SCANNER_DATABASE_URL: postgresql://scanner:scanner@localhost:5432/test
   API_KEY: super-secret-key
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
   SMTP_HOST: smtp.mailtrap.io
@@ -99,8 +100,6 @@ jobs:
 
       - name: Generate Scanner Prisma client
         run: npm run db:generate:scanner
-        env:
-          SCANNER_DATABASE_URL: postgresql://scanner:scanner@localhost:5432/test
 
       - name: Run GitHub scanner service tests
         run: npm run test:github-scanner-service
