@@ -1,6 +1,5 @@
 import express from 'express';
 import path from 'node:path';
-import cron from 'node-cron';
 import {
   metricsMiddleware,
   getMetrics,
@@ -10,7 +9,6 @@ import { PinoLogger } from '@github-notifier/shared';
 import { notFoundHandler } from './middleware/notFoundHandler.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import rootRouter from './routes/index.js';
-import { scannerService } from './containers/scanner.container.js';
 import { bullBoardRouter } from './queue/dashboard.js';
 import { swaggerDocs } from './infrastructure/swagger/swaggerDocs.js';
 import { notificationResultWorker } from './containers/notification-result.container.js';
@@ -34,9 +32,6 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 if (process.env.NODE_ENV !== 'test') {
-  logger.info('Scanner initialized');
-  cron.schedule('*/10 * * * *', scannerService.scanRepositories);
-
   notificationResultWorker.start();
 
   app.listen(PORT, () => {

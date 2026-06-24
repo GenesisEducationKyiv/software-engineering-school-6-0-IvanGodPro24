@@ -1,4 +1,5 @@
 import { Redis } from 'ioredis';
+import cron from 'node-cron';
 import axios from 'axios';
 import { getEnvVar, PinoLogger } from '@github-notifier/shared';
 import { createApp } from './app.js';
@@ -8,12 +9,17 @@ import { scannerPrisma } from './db/client.js';
 import { TrackedRepositoryRepository } from './repositories/tracked-repository.repository.js';
 import { RepositoryTrackingService } from './app/repository-tracking.service.js';
 import { ScannerCommandWorker } from './workers/scanner-command.worker.js';
+import { RedisReleaseCache } from './cache/redis-release-cache.js';
+import { RepositoryScannerService } from './app/repository-scanner.service.js';
+import { ScannerEventPublisher } from './publishers/scanner-event.publisher.js';
 
 const logger = new PinoLogger('GitHubScannerService');
 
 const redis = new Redis(getEnvVar('REDIS_URL'), {
   maxRetriesPerRequest: null,
 });
+
+const releaseCache = new RedisReleaseCache(redis);
 
 const trackedRepositoryRepository = new TrackedRepositoryRepository(
   scannerPrisma,
@@ -39,24 +45,50 @@ const githubApi = axios.create({
       Authorization: `Bearer ${githubToken}`,
     }),
   },
+  validateStatus: (status) => status === 200 || status === 304,
   timeout: Number(getEnvVar('GITHUB_API_TIMEOUT_MS', '5000')),
 });
 
-const githubClient = new GitHubRepositoryClient(githubApi);
+const githubClient = new GitHubRepositoryClient(githubApi, releaseCache);
 
 const repositoryVerificationService = new RepositoryVerificationService(
   githubClient,
+);
+
+const scannerEventPublisher = new ScannerEventPublisher(redis);
+
+const repositoryScannerService = new RepositoryScannerService(
+  trackedRepositoryRepository,
+  githubClient,
+  scannerEventPublisher,
+  logger,
 );
 
 const app = createApp(repositoryVerificationService, logger);
 
 const PORT = Number(getEnvVar('SCANNER_SERVICE_REST_PORT', '3002'));
 
+const scannerCronSchedule = getEnvVar('SCANNER_CRON_SCHEDULE', '*/10 * * * *');
+
+if (!cron.validate(scannerCronSchedule))
+  throw new Error(`Invalid SCANNER_CRON_SCHEDULE: ${scannerCronSchedule}`);
+
 const server = app.listen(PORT, '0.0.0.0', () => {
   logger.info(`GitHub Scanner Service REST server is running on port ${PORT}`);
 });
 
 scannerCommandWorker.start();
+
+const scannerCronTask = cron.schedule(scannerCronSchedule, () => {
+  void repositoryScannerService.scanRepositories();
+});
+
+logger.info(
+  {
+    schedule: scannerCronSchedule,
+  },
+  'Repository scanner cron started',
+);
 
 let shuttingDown = false;
 
@@ -79,8 +111,11 @@ const shutdown = async (signal: string): Promise<void> => {
   logger.info(`Received ${signal}. Shutting down GitHub Scanner Service...`);
 
   try {
+    scannerCronTask.stop();
+
     await closeHttpServer();
     await scannerCommandWorker.close();
+    await scannerEventPublisher.close();
     await scannerPrisma.$disconnect();
     await redis.quit();
 
