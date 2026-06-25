@@ -7,9 +7,8 @@ import {
 import createHttpError from 'http-errors';
 import { randomUUID } from 'node:crypto';
 import { EmailJobData } from '@github-notifier/notification-contracts';
-import { ILogger } from '@github-notifier/shared';
+import { GitHubRepositoryName, ILogger } from '@github-notifier/shared';
 import { IRepositoryVerifier } from '../../github/repository-verifier.port.js';
-import { GithubRepoId } from '../../repositories/github-repo-id.js';
 import { SubscriptionSagaCompensationService } from './subscription-saga-compensation.service.js';
 import { SubscriptionSagaRepository } from './subscription-saga.repository.js';
 
@@ -42,9 +41,12 @@ export class SubscriptionSagaOrchestrator {
     input: StartSubscriptionSagaInput,
   ): Promise<StartSubscriptionSagaResult> {
     const { email, repoName } = input;
-    const repoId = new GithubRepoId(repoName);
+    const repoId = new GitHubRepositoryName(repoName);
 
-    await this.repositoryVerifier.verifyRepository(repoId.owner, repoId.name);
+    await this.repositoryVerifier.verifyRepository(
+      repoId.owner,
+      repoId.repository,
+    );
 
     let sagaId: string | null = null;
 

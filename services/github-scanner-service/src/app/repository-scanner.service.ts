@@ -1,9 +1,8 @@
-import { ILogger } from '@github-notifier/shared';
+import { GitHubRepositoryName, ILogger } from '@github-notifier/shared';
 import { IGitHubReleaseClient } from './github-release-client.port.js';
 import { IScannerEventPublisher } from './scanner-event-publisher.port.js';
 import { ITrackedRepositoryRepository } from '../repositories/tracked-repository.repository.js';
 import { TrackedRepositoryEntity } from '../domain/tracked-repository.entity.js';
-import { GitHubRepositoryId } from '../domain/github-repository-id.js';
 
 export class RepositoryScannerService {
   private scanInProgress = false;
@@ -50,7 +49,7 @@ export class RepositoryScannerService {
     trackedRepository: TrackedRepositoryEntity,
   ): Promise<void> {
     try {
-      const repositoryId = new GitHubRepositoryId(trackedRepository.name);
+      const repositoryId = new GitHubRepositoryName(trackedRepository.name);
 
       const latestTag = await this.githubReleaseClient.getLatestRelease(
         repositoryId.owner,

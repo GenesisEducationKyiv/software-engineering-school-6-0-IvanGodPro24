@@ -1,4 +1,4 @@
-export class GitHubRepositoryId {
+export class GitHubRepositoryName {
   readonly owner: string;
   readonly repository: string;
 
@@ -6,7 +6,9 @@ export class GitHubRepositoryId {
     const parts = fullName.split('/');
 
     if (parts.length !== 2 || !parts[0] || !parts[1]) {
-      throw new Error(`Invalid GitHub repository format: "${fullName}"`);
+      throw new Error(
+        `Invalid GitHub repository format: "${fullName}". Expected format: "owner/repoName"`,
+      );
     }
 
     this.owner = parts[0];
