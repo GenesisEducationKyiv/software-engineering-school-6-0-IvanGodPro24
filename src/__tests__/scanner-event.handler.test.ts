@@ -16,9 +16,7 @@ const repository = {
 } satisfies TrackedRepoEntity;
 
 const repositoryRepository = {
-  upsert: jest.fn(),
   findById: jest.fn(),
-  findWithActiveSubscriptions: jest.fn(),
   updateLastSeenTag: jest.fn(),
 } as jest.Mocked<ITrackedRepoRepository>;
 

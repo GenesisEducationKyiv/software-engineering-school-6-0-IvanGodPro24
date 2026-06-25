@@ -95,35 +95,31 @@ export class GitHubRepositoryClient
       const rateLimitRemaining =
         error.response?.headers['x-ratelimit-remaining'];
 
-      if (status === 404) {
-        throw new RepositoryVerificationError(
-          'NOT_FOUND',
-          'Repository not found',
-        );
-      }
+      switch (true) {
+        case status === 404:
+          throw new RepositoryVerificationError(
+            'NOT_FOUND',
+            'Repository not found',
+          );
 
-      if (
-        status === 429 ||
-        (status === 403 && String(rateLimitRemaining) === '0')
-      ) {
-        throw new RepositoryVerificationError(
-          'RESOURCE_EXHAUSTED',
-          'GitHub rate limit exceeded',
-        );
-      }
+        case status === 429 ||
+          (status === 403 && String(rateLimitRemaining) === '0'):
+          throw new RepositoryVerificationError(
+            'RESOURCE_EXHAUSTED',
+            'GitHub rate limit exceeded',
+          );
 
-      if (status === 403) {
-        throw new RepositoryVerificationError(
-          'PERMISSION_DENIED',
-          'GitHub repository access forbidden',
-        );
-      }
+        case status === 403:
+          throw new RepositoryVerificationError(
+            'PERMISSION_DENIED',
+            'GitHub repository access forbidden',
+          );
 
-      if (!error.response || (status !== undefined && status >= 500)) {
-        throw new RepositoryVerificationError(
-          'UNAVAILABLE',
-          'GitHub API is temporarily unavailable',
-        );
+        case !error.response || (status !== undefined && status >= 500):
+          throw new RepositoryVerificationError(
+            'UNAVAILABLE',
+            'GitHub API is temporarily unavailable',
+          );
       }
     }
 

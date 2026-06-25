@@ -14,12 +14,13 @@ import { RepositoryScannerService } from './app/repository-scanner.service.js';
 import { ScannerEventPublisher } from './publishers/scanner-event.publisher.js';
 
 const logger = new PinoLogger('GitHubScannerService');
+const releaseCacheLogger = new PinoLogger('ReleaseCache');
 
 const redis = new Redis(getEnvVar('REDIS_URL'), {
   maxRetriesPerRequest: null,
 });
 
-const releaseCache = new RedisReleaseCache(redis);
+const releaseCache = new RedisReleaseCache(redis, releaseCacheLogger);
 
 const trackedRepositoryRepository = new TrackedRepositoryRepository(
   scannerPrisma,
