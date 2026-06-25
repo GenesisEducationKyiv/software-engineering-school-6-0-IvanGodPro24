@@ -12,9 +12,12 @@ describe('scanner.service', () => {
   let scannerService: ScannerService;
 
   const mockRepoRepository = {
+    upsert: jest.fn(),
+    findById: jest.fn(),
     findWithActiveSubscriptions: jest.fn(),
     updateLastSeenTag: jest.fn(),
-  } as unknown as jest.Mocked<ITrackedRepoRepository>;
+    updateLastSeenTagIfCurrent: jest.fn(),
+  } as jest.Mocked<ITrackedRepoRepository>;
 
   const mockSubscriptionQueryRepository = {
     findByEmailAndStatusWithRepo: jest.fn(),
