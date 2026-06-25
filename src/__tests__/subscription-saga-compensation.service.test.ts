@@ -7,6 +7,7 @@ import {
 import { ILogger } from '@github-notifier/shared';
 import { SubscriptionSagaRepository } from '../modules/subscriptions/saga/subscription-saga.repository.js';
 import { SubscriptionSagaCompensationService } from '../modules/subscriptions/saga/subscription-saga-compensation.service.js';
+import { createSubscriptionSaga } from './test-factories.js';
 
 const mockPrisma = {
   subscription: {
@@ -46,20 +47,7 @@ describe('SubscriptionSagaCompensationService', () => {
   });
 
   it('deletes newly created PENDING subscription and empty repository', async () => {
-    mockSagaRepository.findById.mockResolvedValue({
-      id: 'saga-1',
-      email: 'user@test.com',
-      repoName: 'facebook/react',
-      repositoryId: 'repo-1',
-      subscriptionId: 'sub-1',
-      createdRepository: true,
-      createdSubscription: true,
-      status: SubscriptionSagaStatus.EMAIL_SEND_REQUESTED,
-      currentStep: 'EMAIL_SEND_REQUESTED',
-      errorMessage: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    mockSagaRepository.findById.mockResolvedValue(createSubscriptionSaga());
 
     mockSagaRepository.markCompensating.mockResolvedValue({} as never);
     mockSagaRepository.markCompensated.mockResolvedValue({} as never);
@@ -96,20 +84,12 @@ describe('SubscriptionSagaCompensationService', () => {
   });
 
   it('restores UNSUBSCRIBED status for existing resubscribe flow', async () => {
-    mockSagaRepository.findById.mockResolvedValue({
-      id: 'saga-1',
-      email: 'user@test.com',
-      repoName: 'facebook/react',
-      repositoryId: 'repo-1',
-      subscriptionId: 'sub-1',
-      createdRepository: false,
-      createdSubscription: false,
-      status: SubscriptionSagaStatus.EMAIL_SEND_REQUESTED,
-      currentStep: 'EMAIL_SEND_REQUESTED',
-      errorMessage: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    mockSagaRepository.findById.mockResolvedValue(
+      createSubscriptionSaga({
+        createdRepository: false,
+        createdSubscription: false,
+      }),
+    );
 
     mockSagaRepository.markCompensating.mockResolvedValue({} as never);
     mockSagaRepository.markCompensated.mockResolvedValue({} as never);
@@ -137,20 +117,7 @@ describe('SubscriptionSagaCompensationService', () => {
   });
 
   it('does not delete repository if it still has subscriptions', async () => {
-    mockSagaRepository.findById.mockResolvedValue({
-      id: 'saga-1',
-      email: 'user@test.com',
-      repoName: 'facebook/react',
-      repositoryId: 'repo-1',
-      subscriptionId: 'sub-1',
-      createdRepository: true,
-      createdSubscription: true,
-      status: SubscriptionSagaStatus.EMAIL_SEND_REQUESTED,
-      currentStep: 'EMAIL_SEND_REQUESTED',
-      errorMessage: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    mockSagaRepository.findById.mockResolvedValue(createSubscriptionSaga());
 
     mockSagaRepository.markCompensating.mockResolvedValue({} as never);
     mockSagaRepository.markCompensated.mockResolvedValue({} as never);
@@ -163,20 +130,12 @@ describe('SubscriptionSagaCompensationService', () => {
   });
 
   it('skips compensation if saga is already COMPLETED', async () => {
-    mockSagaRepository.findById.mockResolvedValue({
-      id: 'saga-1',
-      email: 'user@test.com',
-      repoName: 'facebook/react',
-      repositoryId: 'repo-1',
-      subscriptionId: 'sub-1',
-      createdRepository: true,
-      createdSubscription: true,
-      status: SubscriptionSagaStatus.COMPLETED,
-      currentStep: 'COMPLETED',
-      errorMessage: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    mockSagaRepository.findById.mockResolvedValue(
+      createSubscriptionSaga({
+        status: SubscriptionSagaStatus.COMPLETED,
+        currentStep: 'COMPLETED',
+      }),
+    );
 
     await service.compensate('saga-1', 'SMTP failed');
 
@@ -186,20 +145,13 @@ describe('SubscriptionSagaCompensationService', () => {
   });
 
   it('skips compensation if saga is already COMPENSATED', async () => {
-    mockSagaRepository.findById.mockResolvedValue({
-      id: 'saga-1',
-      email: 'user@test.com',
-      repoName: 'facebook/react',
-      repositoryId: 'repo-1',
-      subscriptionId: 'sub-1',
-      createdRepository: true,
-      createdSubscription: true,
-      status: SubscriptionSagaStatus.COMPENSATED,
-      currentStep: 'COMPENSATED',
-      errorMessage: 'Already failed',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    mockSagaRepository.findById.mockResolvedValue(
+      createSubscriptionSaga({
+        status: SubscriptionSagaStatus.COMPENSATED,
+        currentStep: 'COMPENSATED',
+        errorMessage: 'Already failed',
+      }),
+    );
 
     await service.compensate('saga-1', 'SMTP failed');
 

@@ -4,8 +4,11 @@ import { ITrackedRepositoryRepository } from '../repositories/tracked-repository
 import { IGitHubReleaseClient } from '../app/github-release-client.port.js';
 import { IScannerEventPublisher } from '../app/scanner-event-publisher.port.js';
 import { ILogger } from '@github-notifier/shared';
+import { TrackedRepositoryEntity } from '../domain/tracked-repository.entity.js';
 
-const repository = {
+const createTrackedRepository = (
+  overrides: Partial<TrackedRepositoryEntity> = {},
+): TrackedRepositoryEntity => ({
   id: 'scanner-repository-1',
   sourceRepositoryId: 'main-repository-1',
   name: 'facebook/react',
@@ -13,7 +16,10 @@ const repository = {
   active: true,
   createdAt: new Date(),
   updatedAt: new Date(),
-};
+  ...overrides,
+});
+
+const repository = createTrackedRepository();
 
 const repositoryStore = {
   activate: jest.fn(),
@@ -77,10 +83,9 @@ describe('RepositoryScannerService', () => {
 
   it('does not notify subscribers during initial scan', async () => {
     repositoryStore.findActive.mockResolvedValue([
-      {
-        ...repository,
+      createTrackedRepository({
         lastSeenTag: null,
-      },
+      }),
     ]);
 
     githubClient.getLatestRelease.mockResolvedValue('v18.2.0');

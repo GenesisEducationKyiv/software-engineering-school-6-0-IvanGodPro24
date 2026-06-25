@@ -4,16 +4,14 @@ import { ScannerEventHandler } from '../modules/scanner/scanner-event.handler.js
 import { ITrackedRepoRepository } from '../modules/repositories/tracked-repo.repository.js';
 import { ISubscriptionQueryRepository } from '../modules/subscriptions/subscription-query.repository.js';
 import { IEmailQueue } from '../queue/email-queue.port.js';
-import { TrackedRepoEntity } from '../modules/repositories/tracked-repo.entity.js';
-import { SubscriptionEntity } from '../modules/subscriptions/subscription.entity.js';
+import {
+  createSubscriptionEntity,
+  createTrackedRepoEntity,
+} from './test-factories.js';
 
-const repository = {
-  id: 'repository-1',
-  name: 'facebook/react',
+const repository = createTrackedRepoEntity({
   lastSeenTag: 'v18.2.0',
-  createdAt: new Date(),
-  updatedAt: new Date(),
-} satisfies TrackedRepoEntity;
+});
 
 const repositoryRepository = {
   findById: jest.fn(),
@@ -60,16 +58,13 @@ describe('ScannerEventHandler', () => {
 
   it('updates tag and creates release email jobs', async () => {
     subscriptionQueryRepository.findByRepoIdAndStatus.mockResolvedValue([
-      {
+      createSubscriptionEntity({
         id: 'subscription-1',
         email: 'user@test.com',
-        repositoryId: 'repository-1',
         status: 'ACTIVE',
         confirmToken: 'confirm-token',
         unsubscribeToken: 'unsubscribe-token',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } satisfies SubscriptionEntity,
+      }),
     ]);
 
     await handler.handle({
@@ -128,16 +123,13 @@ describe('ScannerEventHandler', () => {
     });
 
     subscriptionQueryRepository.findByRepoIdAndStatus.mockResolvedValue([
-      {
+      createSubscriptionEntity({
         id: 'subscription-1',
         email: 'user@test.com',
-        repositoryId: 'repository-1',
         status: 'ACTIVE',
         confirmToken: 'confirm-token',
         unsubscribeToken: 'unsubscribe-token',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } satisfies SubscriptionEntity,
+      }),
     ]);
 
     await handler.handle({
@@ -164,16 +156,13 @@ describe('ScannerEventHandler', () => {
 
   it('does not update projection when email job creation fails', async () => {
     subscriptionQueryRepository.findByRepoIdAndStatus.mockResolvedValue([
-      {
+      createSubscriptionEntity({
         id: 'subscription-1',
         email: 'user@test.com',
-        repositoryId: 'repository-1',
         status: 'ACTIVE',
         confirmToken: 'confirm-token',
         unsubscribeToken: 'unsubscribe-token',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } satisfies SubscriptionEntity,
+      }),
     ]);
 
     emailQueue.addBulkEmails.mockRejectedValue(new Error('Redis unavailable'));
@@ -199,16 +188,13 @@ describe('ScannerEventHandler', () => {
     });
 
     subscriptionQueryRepository.findByRepoIdAndStatus.mockResolvedValue([
-      {
+      createSubscriptionEntity({
         id: 'subscription-1',
         email: 'user@test.com',
-        repositoryId: 'repository-1',
         status: 'ACTIVE',
         confirmToken: 'confirm-token',
         unsubscribeToken: 'unsubscribe-token',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } satisfies SubscriptionEntity,
+      }),
     ]);
 
     await handler.handle({

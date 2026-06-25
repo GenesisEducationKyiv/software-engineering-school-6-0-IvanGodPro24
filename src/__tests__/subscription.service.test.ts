@@ -1,10 +1,14 @@
 import { jest } from '@jest/globals';
-import { SubscriptionEntity } from '../modules/subscriptions/subscription.entity.js';
-import { TrackedRepoEntity } from '../modules/repositories/tracked-repo.entity.js';
+import { type SubscriptionEntity } from '../modules/subscriptions/subscription.entity.js';
+import { type TrackedRepoEntity } from '../modules/repositories/tracked-repo.entity.js';
 import { SubscriptionService } from '../modules/subscriptions/subscription.service.js';
 import { ISubscriptionRepository } from '../modules/subscriptions/subscription.repository.js';
 import { ISubscriptionQueryRepository } from '../modules/subscriptions/subscription-query.repository.js';
 import { IScannerCommandPublisher } from '../queue/scanner-command-queue.port.js';
+import {
+  createSubscriptionEntity,
+  createTrackedRepoEntity,
+} from './test-factories.js';
 
 const mockSubscriptionRepository = {
   findByEmailAndRepoId: jest.fn(),
@@ -25,28 +29,6 @@ const scannerCommandPublisher = {
   publish: jest.fn(),
 } as jest.Mocked<IScannerCommandPublisher>;
 
-const createSubscription = (
-  overrides: Partial<SubscriptionEntity> = {},
-): SubscriptionEntity => ({
-  id: 'sub-1',
-  email: 'test@test.com',
-  status: 'PENDING',
-  confirmToken: 'token-123',
-  unsubscribeToken: 'unsub-token',
-  repositoryId: 'repository-1',
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  ...overrides,
-});
-
-const createRepository = (): TrackedRepoEntity => ({
-  id: 'repository-1',
-  name: 'facebook/react',
-  lastSeenTag: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-});
-
 describe('subscription.service', () => {
   let subscriptionService: SubscriptionService;
 
@@ -65,17 +47,17 @@ describe('subscription.service', () => {
   describe('confirmSubscription', () => {
     it('confirms the subscription and enables repository tracking', async () => {
       mockSubscriptionRepository.findByConfirmToken.mockResolvedValue(
-        createSubscription(),
+        createSubscriptionEntity(),
       );
 
       mockSubscriptionRepository.updateStatus.mockResolvedValue(
-        createSubscription({
+        createSubscriptionEntity({
           status: 'ACTIVE',
         }),
       );
 
       mockSubscriptionQueryRepository.findRepositoryById.mockResolvedValue(
-        createRepository(),
+        createTrackedRepoEntity(),
       );
 
       mockSubscriptionQueryRepository.countByRepoIdAndStatus.mockResolvedValue(
@@ -119,7 +101,7 @@ describe('subscription.service', () => {
 
     it('throws 400 if subscription is already confirmed', async () => {
       mockSubscriptionRepository.findByConfirmToken.mockResolvedValue(
-        createSubscription({
+        createSubscriptionEntity({
           status: 'ACTIVE',
         }),
       );
@@ -137,19 +119,19 @@ describe('subscription.service', () => {
   describe('cancelSubscription', () => {
     it('unsubscribes the last active user and disables repository tracking', async () => {
       mockSubscriptionRepository.findByUnsubscribeToken.mockResolvedValue(
-        createSubscription({
+        createSubscriptionEntity({
           status: 'ACTIVE',
         }),
       );
 
       mockSubscriptionRepository.updateStatus.mockResolvedValue(
-        createSubscription({
+        createSubscriptionEntity({
           status: 'UNSUBSCRIBED',
         }),
       );
 
       mockSubscriptionQueryRepository.findRepositoryById.mockResolvedValue(
-        createRepository(),
+        createTrackedRepoEntity(),
       );
 
       mockSubscriptionQueryRepository.countByRepoIdAndStatus.mockResolvedValue(
@@ -173,19 +155,19 @@ describe('subscription.service', () => {
 
     it('keeps repository tracking enabled when other active subscriptions remain', async () => {
       mockSubscriptionRepository.findByUnsubscribeToken.mockResolvedValue(
-        createSubscription({
+        createSubscriptionEntity({
           status: 'ACTIVE',
         }),
       );
 
       mockSubscriptionRepository.updateStatus.mockResolvedValue(
-        createSubscription({
+        createSubscriptionEntity({
           status: 'UNSUBSCRIBED',
         }),
       );
 
       mockSubscriptionQueryRepository.findRepositoryById.mockResolvedValue(
-        createRepository(),
+        createTrackedRepoEntity(),
       );
 
       mockSubscriptionQueryRepository.countByRepoIdAndStatus.mockResolvedValue(
@@ -216,7 +198,7 @@ describe('subscription.service', () => {
 
     it('throws 400 if already unsubscribed', async () => {
       mockSubscriptionRepository.findByUnsubscribeToken.mockResolvedValue(
-        createSubscription({
+        createSubscriptionEntity({
           status: 'UNSUBSCRIBED',
         }),
       );

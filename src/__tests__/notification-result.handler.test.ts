@@ -4,6 +4,7 @@ import { ILogger } from '@github-notifier/shared';
 import { NotificationResultHandler } from '../modules/subscriptions/saga/notification-result.handler.js';
 import { SubscriptionSagaRepository } from '../modules/subscriptions/saga/subscription-saga.repository.js';
 import { SubscriptionSagaCompensationService } from '../modules/subscriptions/saga/subscription-saga-compensation.service.js';
+import { createSubscriptionSaga } from './test-factories.js';
 
 const mockSagaRepository = {
   findById: jest.fn(),
@@ -35,20 +36,7 @@ describe('NotificationResultHandler', () => {
   });
 
   it('marks saga as COMPLETED when confirmation email was sent', async () => {
-    mockSagaRepository.findById.mockResolvedValue({
-      id: 'saga-1',
-      email: 'user@test.com',
-      repoName: 'facebook/react',
-      repositoryId: 'repo-1',
-      subscriptionId: 'sub-1',
-      createdRepository: true,
-      createdSubscription: true,
-      status: SubscriptionSagaStatus.EMAIL_SEND_REQUESTED,
-      currentStep: 'EMAIL_SEND_REQUESTED',
-      errorMessage: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    mockSagaRepository.findById.mockResolvedValue(createSubscriptionSaga());
 
     mockSagaRepository.markCompleted.mockResolvedValue({} as never);
 
@@ -65,20 +53,12 @@ describe('NotificationResultHandler', () => {
   });
 
   it('does not complete saga if it is already COMPLETED', async () => {
-    mockSagaRepository.findById.mockResolvedValue({
-      id: 'saga-1',
-      email: 'user@test.com',
-      repoName: 'facebook/react',
-      repositoryId: 'repo-1',
-      subscriptionId: 'sub-1',
-      createdRepository: true,
-      createdSubscription: true,
-      status: SubscriptionSagaStatus.COMPLETED,
-      currentStep: 'COMPLETED',
-      errorMessage: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    mockSagaRepository.findById.mockResolvedValue(
+      createSubscriptionSaga({
+        status: SubscriptionSagaStatus.COMPLETED,
+        currentStep: 'COMPLETED',
+      }),
+    );
 
     await handler.handle({
       type: 'confirmation-email-sent',
@@ -92,20 +72,13 @@ describe('NotificationResultHandler', () => {
   });
 
   it('ignores email sent event for compensated saga', async () => {
-    mockSagaRepository.findById.mockResolvedValue({
-      id: 'saga-1',
-      email: 'user@test.com',
-      repoName: 'facebook/react',
-      repositoryId: 'repo-1',
-      subscriptionId: 'sub-1',
-      createdRepository: true,
-      createdSubscription: true,
-      status: SubscriptionSagaStatus.COMPENSATED,
-      currentStep: 'COMPENSATED',
-      errorMessage: 'SMTP failed',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    mockSagaRepository.findById.mockResolvedValue(
+      createSubscriptionSaga({
+        status: SubscriptionSagaStatus.COMPENSATED,
+        currentStep: 'COMPENSATED',
+        errorMessage: 'SMTP failed',
+      }),
+    );
 
     await handler.handle({
       type: 'confirmation-email-sent',

@@ -95,6 +95,52 @@ type PrismaClientMock = {
 const asyncMock = <Args extends unknown[], Result>(): AsyncMock<Args, Result> =>
   jest.fn<(...args: Args) => Promise<Result>>();
 
+const startInput = {
+  email: 'user@test.com',
+  repoName: 'facebook/react',
+};
+
+const createRepositoryRecord = (
+  overrides: Partial<RepositoryRecord> = {},
+): RepositoryRecord => ({
+  id: 'repo-1',
+  name: 'facebook/react',
+  ...overrides,
+});
+
+const createExistingSubscriptionRecord = (
+  overrides: Partial<ExistingSubscriptionRecord> = {},
+): ExistingSubscriptionRecord => ({
+  id: 'sub-1',
+  email: 'user@test.com',
+  status: SubscriptionStatus.PENDING,
+  repositoryId: 'repo-1',
+  ...overrides,
+});
+
+const createSubscriptionRecord = (
+  overrides: Partial<SubscriptionRecord> = {},
+): SubscriptionRecord => ({
+  ...createExistingSubscriptionRecord(),
+  confirmToken: 'confirm-token-123',
+  unsubscribeToken: 'unsubscribe-token-123',
+  ...overrides,
+});
+
+const createSagaRecord = (
+  overrides: Partial<SagaRecord> = {},
+): SagaRecord => ({
+  id: 'saga-1',
+  email: 'user@test.com',
+  repoName: 'facebook/react',
+  repositoryId: 'repo-1',
+  createdRepository: false,
+  createdSubscription: false,
+  status: SubscriptionSagaStatus.STARTED,
+  currentStep: 'STARTED',
+  ...overrides,
+});
+
 const mockTx: MockTransactionClient = {
   repository: {
     findUnique: asyncMock(),
@@ -175,39 +221,21 @@ describe('SubscriptionSagaOrchestrator', () => {
     mockRepositoryVerifier.verifyRepository.mockResolvedValue(undefined);
 
     mockTx.repository.findUnique.mockResolvedValue(null);
-    mockTx.repository.create.mockResolvedValue({
-      id: 'repo-1',
-      name: 'facebook/react',
-    });
+    mockTx.repository.create.mockResolvedValue(createRepositoryRecord());
 
     mockTx.subscription.findUnique.mockResolvedValue(null);
-    mockTx.subscription.create.mockResolvedValue({
-      id: 'sub-1',
-      email: 'user@test.com',
-      status: SubscriptionStatus.PENDING,
-      confirmToken: 'confirm-token-123',
-      unsubscribeToken: 'unsubscribe-token-123',
-      repositoryId: 'repo-1',
-    });
+    mockTx.subscription.create.mockResolvedValue(createSubscriptionRecord());
 
-    mockTx.subscriptionSaga.create.mockResolvedValue({
-      id: 'saga-1',
-      email: 'user@test.com',
-      repoName: 'facebook/react',
-      repositoryId: 'repo-1',
-      createdRepository: true,
-      createdSubscription: false,
-      status: SubscriptionSagaStatus.STARTED,
-      currentStep: 'STARTED',
-    });
+    mockTx.subscriptionSaga.create.mockResolvedValue(
+      createSagaRecord({
+        createdRepository: true,
+      }),
+    );
 
     mockTx.subscriptionSaga.update.mockResolvedValue({});
     mockEmailQueue.addEmail.mockResolvedValue(undefined);
 
-    const result = await orchestrator.start({
-      email: 'user@test.com',
-      repoName: 'facebook/react',
-    });
+    const result = await orchestrator.start(startInput);
 
     expect(mockRepositoryVerifier.verifyRepository).toHaveBeenCalledWith(
       'facebook',
@@ -269,24 +297,15 @@ describe('SubscriptionSagaOrchestrator', () => {
   it('throws 409 if subscription is already ACTIVE', async () => {
     mockRepositoryVerifier.verifyRepository.mockResolvedValue(undefined);
 
-    mockTx.repository.findUnique.mockResolvedValue({
-      id: 'repo-1',
-      name: 'facebook/react',
-    });
+    mockTx.repository.findUnique.mockResolvedValue(createRepositoryRecord());
 
-    mockTx.subscription.findUnique.mockResolvedValue({
-      id: 'sub-1',
-      email: 'user@test.com',
-      status: SubscriptionStatus.ACTIVE,
-      repositoryId: 'repo-1',
-    });
-
-    await expect(
-      orchestrator.start({
-        email: 'user@test.com',
-        repoName: 'facebook/react',
+    mockTx.subscription.findUnique.mockResolvedValue(
+      createExistingSubscriptionRecord({
+        status: SubscriptionStatus.ACTIVE,
       }),
-    ).rejects.toMatchObject({
+    );
+
+    await expect(orchestrator.start(startInput)).rejects.toMatchObject({
       status: 409,
     });
 
@@ -297,24 +316,13 @@ describe('SubscriptionSagaOrchestrator', () => {
   it('throws 409 if subscription is already PENDING', async () => {
     mockRepositoryVerifier.verifyRepository.mockResolvedValue(undefined);
 
-    mockTx.repository.findUnique.mockResolvedValue({
-      id: 'repo-1',
-      name: 'facebook/react',
-    });
+    mockTx.repository.findUnique.mockResolvedValue(createRepositoryRecord());
 
-    mockTx.subscription.findUnique.mockResolvedValue({
-      id: 'sub-1',
-      email: 'user@test.com',
-      status: SubscriptionStatus.PENDING,
-      repositoryId: 'repo-1',
-    });
+    mockTx.subscription.findUnique.mockResolvedValue(
+      createExistingSubscriptionRecord(),
+    );
 
-    await expect(
-      orchestrator.start({
-        email: 'user@test.com',
-        repoName: 'facebook/react',
-      }),
-    ).rejects.toMatchObject({
+    await expect(orchestrator.start(startInput)).rejects.toMatchObject({
       status: 409,
     });
 
@@ -325,23 +333,11 @@ describe('SubscriptionSagaOrchestrator', () => {
   it('throws 409 if Prisma unique constraint error happens during subscription creation', async () => {
     mockRepositoryVerifier.verifyRepository.mockResolvedValue(undefined);
 
-    mockTx.repository.findUnique.mockResolvedValue({
-      id: 'repo-1',
-      name: 'facebook/react',
-    });
+    mockTx.repository.findUnique.mockResolvedValue(createRepositoryRecord());
 
     mockTx.subscription.findUnique.mockResolvedValue(null);
 
-    mockTx.subscriptionSaga.create.mockResolvedValue({
-      id: 'saga-1',
-      email: 'user@test.com',
-      repoName: 'facebook/react',
-      repositoryId: 'repo-1',
-      createdRepository: false,
-      createdSubscription: false,
-      status: SubscriptionSagaStatus.STARTED,
-      currentStep: 'STARTED',
-    });
+    mockTx.subscriptionSaga.create.mockResolvedValue(createSagaRecord());
 
     mockTx.subscription.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
@@ -353,12 +349,7 @@ describe('SubscriptionSagaOrchestrator', () => {
       }),
     );
 
-    await expect(
-      orchestrator.start({
-        email: 'user@test.com',
-        repoName: 'facebook/react',
-      }),
-    ).rejects.toMatchObject({
+    await expect(orchestrator.start(startInput)).rejects.toMatchObject({
       status: 409,
       message: 'Subscription is processing or already exists.',
     });
@@ -372,45 +363,28 @@ describe('SubscriptionSagaOrchestrator', () => {
   it('resubscribes UNSUBSCRIBED subscription and publishes confirmation email command', async () => {
     mockRepositoryVerifier.verifyRepository.mockResolvedValue(undefined);
 
-    mockTx.repository.findUnique.mockResolvedValue({
-      id: 'repo-1',
-      name: 'facebook/react',
-    });
+    mockTx.repository.findUnique.mockResolvedValue(createRepositoryRecord());
 
-    mockTx.subscription.findUnique.mockResolvedValue({
-      id: 'sub-1',
-      email: 'user@test.com',
-      status: SubscriptionStatus.UNSUBSCRIBED,
-      repositoryId: 'repo-1',
-    });
+    mockTx.subscription.findUnique.mockResolvedValue(
+      createExistingSubscriptionRecord({
+        status: SubscriptionStatus.UNSUBSCRIBED,
+      }),
+    );
 
-    mockTx.subscription.update.mockResolvedValue({
-      id: 'sub-1',
-      email: 'user@test.com',
-      status: SubscriptionStatus.PENDING,
-      confirmToken: 'new-confirm-token',
-      unsubscribeToken: 'new-unsubscribe-token',
-      repositoryId: 'repo-1',
-    });
+    mockTx.subscription.update.mockResolvedValue(
+      createSubscriptionRecord({
+        status: SubscriptionStatus.PENDING,
+        confirmToken: 'new-confirm-token',
+        unsubscribeToken: 'new-unsubscribe-token',
+      }),
+    );
 
-    mockTx.subscriptionSaga.create.mockResolvedValue({
-      id: 'saga-1',
-      email: 'user@test.com',
-      repoName: 'facebook/react',
-      repositoryId: 'repo-1',
-      createdRepository: false,
-      createdSubscription: false,
-      status: SubscriptionSagaStatus.STARTED,
-      currentStep: 'STARTED',
-    });
+    mockTx.subscriptionSaga.create.mockResolvedValue(createSagaRecord());
 
     mockTx.subscriptionSaga.update.mockResolvedValue({});
     mockEmailQueue.addEmail.mockResolvedValue(undefined);
 
-    const result = await orchestrator.start({
-      email: 'user@test.com',
-      repoName: 'facebook/react',
-    });
+    const result = await orchestrator.start(startInput);
 
     expect(mockTx.subscription.update).toHaveBeenCalledTimes(1);
 
@@ -455,43 +429,26 @@ describe('SubscriptionSagaOrchestrator', () => {
     mockRepositoryVerifier.verifyRepository.mockResolvedValue(undefined);
 
     mockTx.repository.findUnique.mockResolvedValue(null);
-    mockTx.repository.create.mockResolvedValue({
-      id: 'repo-1',
-      name: 'facebook/react',
-    });
+    mockTx.repository.create.mockResolvedValue(createRepositoryRecord());
 
     mockTx.subscription.findUnique.mockResolvedValue(null);
-    mockTx.subscription.create.mockResolvedValue({
-      id: 'sub-1',
-      email: 'user@test.com',
-      status: SubscriptionStatus.PENDING,
-      confirmToken: 'confirm-token-123',
-      unsubscribeToken: 'unsubscribe-token-123',
-      repositoryId: 'repo-1',
-    });
+    mockTx.subscription.create.mockResolvedValue(createSubscriptionRecord());
 
-    mockTx.subscriptionSaga.create.mockResolvedValue({
-      id: 'saga-1',
-      email: 'user@test.com',
-      repoName: 'facebook/react',
-      repositoryId: 'repo-1',
-      createdRepository: true,
-      createdSubscription: true,
-      status: SubscriptionSagaStatus.STARTED,
-      currentStep: 'STARTED',
-    });
+    mockTx.subscriptionSaga.create.mockResolvedValue(
+      createSagaRecord({
+        createdRepository: true,
+        createdSubscription: true,
+      }),
+    );
 
     mockTx.subscriptionSaga.update.mockResolvedValue({});
     mockSagaRepository.markEmailSendRequested.mockResolvedValue({} as never);
     mockEmailQueue.addEmail.mockRejectedValue(new Error('Redis unavailable'));
     mockCompensationService.compensate.mockResolvedValue(undefined);
 
-    await expect(
-      orchestrator.start({
-        email: 'user@test.com',
-        repoName: 'facebook/react',
-      }),
-    ).rejects.toThrow('Redis unavailable');
+    await expect(orchestrator.start(startInput)).rejects.toThrow(
+      'Redis unavailable',
+    );
 
     expect(mockCompensationService.compensate).toHaveBeenCalledWith(
       'saga-1',
@@ -502,49 +459,32 @@ describe('SubscriptionSagaOrchestrator', () => {
   it('delegates compensation if email command publishing fails for resubscribe flow', async () => {
     mockRepositoryVerifier.verifyRepository.mockResolvedValue(undefined);
 
-    mockTx.repository.findUnique.mockResolvedValue({
-      id: 'repo-1',
-      name: 'facebook/react',
-    });
+    mockTx.repository.findUnique.mockResolvedValue(createRepositoryRecord());
 
-    mockTx.subscription.findUnique.mockResolvedValue({
-      id: 'sub-1',
-      email: 'user@test.com',
-      status: SubscriptionStatus.UNSUBSCRIBED,
-      repositoryId: 'repo-1',
-    });
+    mockTx.subscription.findUnique.mockResolvedValue(
+      createExistingSubscriptionRecord({
+        status: SubscriptionStatus.UNSUBSCRIBED,
+      }),
+    );
 
-    mockTx.subscription.update.mockResolvedValue({
-      id: 'sub-1',
-      email: 'user@test.com',
-      status: SubscriptionStatus.PENDING,
-      confirmToken: 'new-confirm-token',
-      unsubscribeToken: 'new-unsubscribe-token',
-      repositoryId: 'repo-1',
-    });
+    mockTx.subscription.update.mockResolvedValue(
+      createSubscriptionRecord({
+        status: SubscriptionStatus.PENDING,
+        confirmToken: 'new-confirm-token',
+        unsubscribeToken: 'new-unsubscribe-token',
+      }),
+    );
 
-    mockTx.subscriptionSaga.create.mockResolvedValue({
-      id: 'saga-1',
-      email: 'user@test.com',
-      repoName: 'facebook/react',
-      repositoryId: 'repo-1',
-      createdRepository: false,
-      createdSubscription: false,
-      status: SubscriptionSagaStatus.STARTED,
-      currentStep: 'STARTED',
-    });
+    mockTx.subscriptionSaga.create.mockResolvedValue(createSagaRecord());
 
     mockTx.subscriptionSaga.update.mockResolvedValue({});
     mockSagaRepository.markEmailSendRequested.mockResolvedValue({} as never);
     mockEmailQueue.addEmail.mockRejectedValue(new Error('Redis unavailable'));
     mockCompensationService.compensate.mockResolvedValue(undefined);
 
-    await expect(
-      orchestrator.start({
-        email: 'user@test.com',
-        repoName: 'facebook/react',
-      }),
-    ).rejects.toThrow('Redis unavailable');
+    await expect(orchestrator.start(startInput)).rejects.toThrow(
+      'Redis unavailable',
+    );
 
     expect(mockCompensationService.compensate).toHaveBeenCalledWith(
       'saga-1',
