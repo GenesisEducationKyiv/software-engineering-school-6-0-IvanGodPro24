@@ -58,56 +58,26 @@ export class ScannerEventHandler {
       return;
     }
 
-    if (repository.lastSeenTag === event.currentTag) {
-      this.logger.info(
-        {
-          repositoryId: event.repositoryId,
-          tag: event.currentTag,
-        },
-        'Scanner event already processed',
-      );
-
-      return;
-    }
-
-    if (
-      event.notifySubscribers &&
-      repository.lastSeenTag !== event.previousTag
-    ) {
+    if (repository.lastSeenTag !== event.previousTag) {
       this.logger.warn(
         {
           repositoryId: event.repositoryId,
-          storedTag: repository.lastSeenTag,
-          eventPreviousTag: event.previousTag,
-          eventCurrentTag: event.currentTag,
+          projectionTag: repository.lastSeenTag,
+          scannerPreviousTag: event.previousTag,
+          scannerCurrentTag: event.currentTag,
         },
-        'Stale or out-of-order scanner event ignored',
+        'Repository tag projection differs from scanner state',
       );
-
-      return;
-    }
-
-    const storedPreviousTag = repository.lastSeenTag;
-
-    const updated = await this.repositoryRepository.updateLastSeenTagIfCurrent(
-      repository.id,
-      storedPreviousTag,
-      event.currentTag,
-    );
-
-    if (!updated) {
-      this.logger.warn(
-        {
-          repositoryId: event.repositoryId,
-          tag: event.currentTag,
-        },
-        'Scanner event skipped because repository was concurrently updated',
-      );
-
-      return;
     }
 
     if (!event.notifySubscribers) {
+      if (repository.lastSeenTag !== event.currentTag) {
+        await this.repositoryRepository.updateLastSeenTag(
+          repository.id,
+          event.currentTag,
+        );
+      }
+
       this.logger.info(
         {
           repositoryId: event.repositoryId,
@@ -119,76 +89,43 @@ export class ScannerEventHandler {
       return;
     }
 
-    try {
-      const subscriptions =
-        await this.subscriptionQueryRepository.findByRepoIdAndStatus(
-          repository.id,
-          'ACTIVE',
-        );
+    const subscriptions =
+      await this.subscriptionQueryRepository.findByRepoIdAndStatus(
+        repository.id,
+        'ACTIVE',
+      );
 
-      if (subscriptions.length === 0) {
-        this.logger.info(
-          {
-            repositoryId: event.repositoryId,
-            tag: event.currentTag,
-          },
-          'No active subscribers for repository release',
-        );
-
-        return;
-      }
-
+    if (subscriptions.length > 0) {
       await this.emailQueue.addBulkEmails(
         subscriptions.map((subscription) => ({
           type: 'new-release',
+          subscriptionId: subscription.id,
           email: subscription.email,
           repoName: repository.name,
           tag: event.currentTag,
           unsubscribeToken: subscription.unsubscribeToken,
         })),
       );
-
-      this.logger.info(
-        {
-          repositoryId: event.repositoryId,
-          tag: event.currentTag,
-          subscriptionsCount: subscriptions.length,
-        },
-        'Release notification jobs created',
-      );
-    } catch (error) {
-      let tagReverted = false;
-
-      try {
-        tagReverted =
-          await this.repositoryRepository.updateLastSeenTagIfCurrent(
-            repository.id,
-            event.currentTag,
-            storedPreviousTag,
-          );
-      } catch (rollbackError) {
-        this.logger.error(
-          {
-            err: rollbackError,
-            repositoryId: event.repositoryId,
-            currentTag: event.currentTag,
-            previousTag: storedPreviousTag,
-          },
-          'Failed to revert repository tag after event processing failure',
-        );
-      }
-
-      this.logger.error(
-        {
-          err: error,
-          repositoryId: event.repositoryId,
-          tag: event.currentTag,
-          tagReverted,
-        },
-        'Failed to create release notification jobs',
-      );
-
-      throw error;
     }
+
+    if (repository.lastSeenTag !== event.currentTag) {
+      await this.repositoryRepository.updateLastSeenTag(
+        repository.id,
+        event.currentTag,
+      );
+    }
+
+    this.logger.info(
+      {
+        repositoryId: event.repositoryId,
+        tag: event.currentTag,
+        subscriptionsCount: subscriptions.length,
+        projectionPreviousTag: repository.lastSeenTag,
+        scannerPreviousTag: event.previousTag,
+      },
+      subscriptions.length > 0
+        ? 'Release notification jobs ensured'
+        : 'Repository tag projection updated without active subscribers',
+    );
   }
 }

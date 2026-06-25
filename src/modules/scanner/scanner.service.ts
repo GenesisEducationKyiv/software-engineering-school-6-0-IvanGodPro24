@@ -51,6 +51,7 @@ export class ScannerService {
             await this.emailQueue.addBulkEmails(
               subscriptions.map((sub) => ({
                 type: 'new-release',
+                subscriptionId: sub.id,
                 email: sub.email,
                 repoName: repo.name,
                 tag: latestTag,

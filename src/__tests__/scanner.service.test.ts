@@ -16,7 +16,6 @@ describe('scanner.service', () => {
     findById: jest.fn(),
     findWithActiveSubscriptions: jest.fn(),
     updateLastSeenTag: jest.fn(),
-    updateLastSeenTagIfCurrent: jest.fn(),
   } as jest.Mocked<ITrackedRepoRepository>;
 
   const mockSubscriptionQueryRepository = {
@@ -112,10 +111,12 @@ describe('scanner.service', () => {
 
     mockSubscriptionQueryRepository.findByRepoIdAndStatus.mockResolvedValue([
       {
+        id: 'subscription-1',
         email: 'user1@test.com',
         unsubscribeToken: 'tkn1',
       } as SubscriptionEntity,
       {
+        id: 'subscription-2',
         email: 'user2@test.com',
         unsubscribeToken: 'tkn2',
       } as SubscriptionEntity,
@@ -130,6 +131,7 @@ describe('scanner.service', () => {
     expect(mockEmailQueue.addBulkEmails).toHaveBeenCalledWith([
       {
         type: 'new-release',
+        subscriptionId: 'subscription-1',
         email: 'user1@test.com',
         repoName: 'facebook/react',
         tag: 'v19.0.0',
@@ -137,6 +139,7 @@ describe('scanner.service', () => {
       },
       {
         type: 'new-release',
+        subscriptionId: 'subscription-2',
         email: 'user2@test.com',
         repoName: 'facebook/react',
         tag: 'v19.0.0',
@@ -164,7 +167,11 @@ describe('scanner.service', () => {
       .mockResolvedValueOnce('v2.0');
 
     mockSubscriptionQueryRepository.findByRepoIdAndStatus.mockResolvedValue([
-      { email: 'user@test.com', unsubscribeToken: 'tkn' } as SubscriptionEntity,
+      {
+        id: 'subscription-1',
+        email: 'user@test.com',
+        unsubscribeToken: 'tkn',
+      } as SubscriptionEntity,
     ]);
 
     await scannerService.scanRepositories();

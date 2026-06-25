@@ -20,7 +20,6 @@ const repositoryRepository = {
   findById: jest.fn(),
   findWithActiveSubscriptions: jest.fn(),
   updateLastSeenTag: jest.fn(),
-  updateLastSeenTagIfCurrent: jest.fn(),
 } as jest.Mocked<ITrackedRepoRepository>;
 
 const subscriptionQueryRepository = {
@@ -49,7 +48,8 @@ describe('ScannerEventHandler', () => {
     jest.resetAllMocks();
 
     repositoryRepository.findById.mockResolvedValue(repository);
-    repositoryRepository.updateLastSeenTagIfCurrent.mockResolvedValue(true);
+    repositoryRepository.updateLastSeenTag.mockResolvedValue(undefined);
+    subscriptionQueryRepository.findByRepoIdAndStatus.mockResolvedValue([]);
     emailQueue.addBulkEmails.mockResolvedValue(undefined);
 
     handler = new ScannerEventHandler(
@@ -83,13 +83,15 @@ describe('ScannerEventHandler', () => {
       notifySubscribers: true,
     });
 
-    expect(
-      repositoryRepository.updateLastSeenTagIfCurrent,
-    ).toHaveBeenCalledWith('repository-1', 'v18.2.0', 'v19.0.0');
+    expect(repositoryRepository.updateLastSeenTag).toHaveBeenCalledWith(
+      'repository-1',
+      'v19.0.0',
+    );
 
     expect(emailQueue.addBulkEmails).toHaveBeenCalledWith([
       {
         type: 'new-release',
+        subscriptionId: 'subscription-1',
         email: 'user@test.com',
         repoName: 'facebook/react',
         tag: 'v19.0.0',
@@ -113,58 +115,20 @@ describe('ScannerEventHandler', () => {
       notifySubscribers: false,
     });
 
-    expect(
-      repositoryRepository.updateLastSeenTagIfCurrent,
-    ).toHaveBeenCalledWith('repository-1', null, 'v18.2.0');
+    expect(repositoryRepository.updateLastSeenTag).toHaveBeenCalledWith(
+      'repository-1',
+      'v18.2.0',
+    );
 
     expect(emailQueue.addBulkEmails).not.toHaveBeenCalled();
   });
 
-  it('ignores an already processed event', async () => {
+  it('processes release event when Main DB projection differs from scanner previous tag', async () => {
     repositoryRepository.findById.mockResolvedValue({
       ...repository,
-      lastSeenTag: 'v19.0.0',
+      lastSeenTag: null,
     });
 
-    await handler.handle({
-      type: 'repository-tag-updated',
-      repositoryId: 'repository-1',
-      repoName: 'facebook/react',
-      previousTag: 'v18.2.0',
-      currentTag: 'v19.0.0',
-      notifySubscribers: true,
-    });
-
-    expect(
-      repositoryRepository.updateLastSeenTagIfCurrent,
-    ).not.toHaveBeenCalled();
-
-    expect(emailQueue.addBulkEmails).not.toHaveBeenCalled();
-  });
-
-  it('ignores a stale release event', async () => {
-    repositoryRepository.findById.mockResolvedValue({
-      ...repository,
-      lastSeenTag: 'v20.0.0',
-    });
-
-    await handler.handle({
-      type: 'repository-tag-updated',
-      repositoryId: 'repository-1',
-      repoName: 'facebook/react',
-      previousTag: 'v18.2.0',
-      currentTag: 'v19.0.0',
-      notifySubscribers: true,
-    });
-
-    expect(
-      repositoryRepository.updateLastSeenTagIfCurrent,
-    ).not.toHaveBeenCalled();
-
-    expect(emailQueue.addBulkEmails).not.toHaveBeenCalled();
-  });
-
-  it('reverts tag when email job creation fails', async () => {
     subscriptionQueryRepository.findByRepoIdAndStatus.mockResolvedValue([
       {
         id: 'subscription-1',
@@ -178,9 +142,41 @@ describe('ScannerEventHandler', () => {
       } satisfies SubscriptionEntity,
     ]);
 
-    repositoryRepository.updateLastSeenTagIfCurrent
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(true);
+    await handler.handle({
+      type: 'repository-tag-updated',
+      repositoryId: 'repository-1',
+      repoName: 'facebook/react',
+      previousTag: 'v18.2.0',
+      currentTag: 'v19.0.0',
+      notifySubscribers: true,
+    });
+
+    expect(emailQueue.addBulkEmails).toHaveBeenCalledWith([
+      expect.objectContaining({
+        subscriptionId: 'subscription-1',
+        tag: 'v19.0.0',
+      }),
+    ]);
+
+    expect(repositoryRepository.updateLastSeenTag).toHaveBeenCalledWith(
+      'repository-1',
+      'v19.0.0',
+    );
+  });
+
+  it('does not update projection when email job creation fails', async () => {
+    subscriptionQueryRepository.findByRepoIdAndStatus.mockResolvedValue([
+      {
+        id: 'subscription-1',
+        email: 'user@test.com',
+        repositoryId: 'repository-1',
+        status: 'ACTIVE',
+        confirmToken: 'confirm-token',
+        unsubscribeToken: 'unsubscribe-token',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } satisfies SubscriptionEntity,
+    ]);
 
     emailQueue.addBulkEmails.mockRejectedValue(new Error('Redis unavailable'));
 
@@ -195,12 +191,44 @@ describe('ScannerEventHandler', () => {
       }),
     ).rejects.toThrow('Redis unavailable');
 
-    expect(
-      repositoryRepository.updateLastSeenTagIfCurrent,
-    ).toHaveBeenNthCalledWith(1, 'repository-1', 'v18.2.0', 'v19.0.0');
+    expect(repositoryRepository.updateLastSeenTag).not.toHaveBeenCalled();
+  });
 
-    expect(
-      repositoryRepository.updateLastSeenTagIfCurrent,
-    ).toHaveBeenNthCalledWith(2, 'repository-1', 'v19.0.0', 'v18.2.0');
+  it('enqueues idempotent email jobs when projection already has current tag', async () => {
+    repositoryRepository.findById.mockResolvedValue({
+      ...repository,
+      lastSeenTag: 'v19.0.0',
+    });
+
+    subscriptionQueryRepository.findByRepoIdAndStatus.mockResolvedValue([
+      {
+        id: 'subscription-1',
+        email: 'user@test.com',
+        repositoryId: 'repository-1',
+        status: 'ACTIVE',
+        confirmToken: 'confirm-token',
+        unsubscribeToken: 'unsubscribe-token',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } satisfies SubscriptionEntity,
+    ]);
+
+    await handler.handle({
+      type: 'repository-tag-updated',
+      repositoryId: 'repository-1',
+      repoName: 'facebook/react',
+      previousTag: 'v18.2.0',
+      currentTag: 'v19.0.0',
+      notifySubscribers: true,
+    });
+
+    expect(emailQueue.addBulkEmails).toHaveBeenCalledWith([
+      expect.objectContaining({
+        subscriptionId: 'subscription-1',
+        tag: 'v19.0.0',
+      }),
+    ]);
+
+    expect(repositoryRepository.updateLastSeenTag).not.toHaveBeenCalled();
   });
 });
