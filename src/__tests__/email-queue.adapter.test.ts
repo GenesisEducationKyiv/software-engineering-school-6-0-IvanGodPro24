@@ -4,7 +4,7 @@ import { EmailJobData } from '@github-notifier/notification-contracts';
 import {
   createNewReleaseJobId,
   EmailQueueAdapter,
-} from '../queue/email-queue.adapter.js';
+} from '../queue/email/email-queue.adapter.js';
 
 describe('EmailQueueAdapter', () => {
   const queue = {

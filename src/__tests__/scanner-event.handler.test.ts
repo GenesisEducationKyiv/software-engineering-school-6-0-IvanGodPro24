@@ -3,7 +3,7 @@ import { ILogger } from '@github-notifier/shared';
 import { ScannerEventHandler } from '../modules/scanner/scanner-event.handler.js';
 import { ITrackedRepoRepository } from '../modules/repositories/tracked-repo.repository.js';
 import { ISubscriptionQueryRepository } from '../modules/subscriptions/subscription-query.repository.js';
-import { IEmailQueue } from '../queue/email-queue.port.js';
+import { IEmailQueue } from '../queue/email/email-queue.port.js';
 import {
   createSubscriptionEntity,
   createTrackedRepoEntity,

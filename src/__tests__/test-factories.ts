@@ -1,4 +1,4 @@
-import { SubscriptionSagaStatus } from '@prisma/client';
+import { type SubscriptionSagaStatus } from '@prisma/client';
 import { SubscriptionEntity } from '../modules/subscriptions/subscription.entity.js';
 import { TrackedRepoEntity } from '../modules/repositories/tracked-repo.entity.js';
 
@@ -52,7 +52,7 @@ export const createSubscriptionSaga = (
   subscriptionId: 'sub-1',
   createdRepository: true,
   createdSubscription: true,
-  status: SubscriptionSagaStatus.EMAIL_SEND_REQUESTED,
+  status: 'EMAIL_SEND_REQUESTED',
   currentStep: 'EMAIL_SEND_REQUESTED',
   errorMessage: null,
   createdAt: new Date(),

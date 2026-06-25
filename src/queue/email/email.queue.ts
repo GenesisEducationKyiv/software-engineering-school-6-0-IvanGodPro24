@@ -1,5 +1,5 @@
 import { Queue } from 'bullmq';
-import { redis } from '../infrastructure/redis/redis.js';
+import { redis } from '../../infrastructure/redis/redis.js';
 import {
   EmailJobData,
   EMAIL_QUEUE_NAME,

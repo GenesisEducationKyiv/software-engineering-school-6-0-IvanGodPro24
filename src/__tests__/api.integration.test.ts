@@ -15,7 +15,7 @@ jest.unstable_mockModule(
 
 const mockAddEmail = jest.fn<(...args: unknown[]) => Promise<void>>();
 const mockAddBulkEmails = jest.fn<(...args: unknown[]) => Promise<void>>();
-jest.unstable_mockModule('../queue/email-queue.adapter.js', () => ({
+jest.unstable_mockModule('../queue/email/email-queue.adapter.js', () => ({
   EmailQueueAdapter: class {
     addEmail = mockAddEmail;
     addBulkEmails = mockAddBulkEmails;
@@ -25,10 +25,11 @@ jest.unstable_mockModule('../queue/email-queue.adapter.js', () => ({
 const { app } = await import('../index.js');
 const { prisma } = await import('../infrastructure/db/client.js');
 const { redis } = await import('../infrastructure/redis/redis.js');
-const { emailQueue } = await import('../queue/email.queue.js');
+const { emailQueue } = await import('../queue/email/email.queue.js');
 const { scannerCommandQueue } =
-  await import('../queue/scanner-command.queue.js');
-const { scannerEventQueue } = await import('../queue/scanner-event.queue.js');
+  await import('../queue/scanner/scanner-command.queue.js');
+const { scannerEventQueue } =
+  await import('../queue/scanner/scanner-event.queue.js');
 
 async function seedSubscription(
   email: string,

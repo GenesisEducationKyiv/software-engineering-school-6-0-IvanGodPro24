@@ -1,7 +1,7 @@
 import createHttpError from 'http-errors';
 import { ISubscriptionRepository } from './subscription.repository.js';
 import { ISubscriptionQueryRepository } from './subscription-query.repository.js';
-import { IScannerCommandPublisher } from '../../queue/scanner-command-queue.port.js';
+import { IScannerCommandPublisher } from '../../queue/scanner/scanner-command-queue.port.js';
 
 export class SubscriptionService {
   constructor(

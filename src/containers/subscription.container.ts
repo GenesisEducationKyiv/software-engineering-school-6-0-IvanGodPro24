@@ -10,10 +10,10 @@ import {
   repositoryVerifier,
   subscriptionQueryRepository,
 } from './shared.container.js';
-import { EmailQueueAdapter } from '../queue/email-queue.adapter.js';
-import { emailQueue } from '../queue/email.queue.js';
-import { ScannerCommandQueueAdapter } from '../queue/scanner-command-queue.adapter.js';
-import { scannerCommandQueue } from '../queue/scanner-command.queue.js';
+import { EmailQueueAdapter } from '../queue/email/email-queue.adapter.js';
+import { emailQueue } from '../queue/email/email.queue.js';
+import { ScannerCommandQueueAdapter } from '../queue/scanner/scanner-command-queue.adapter.js';
+import { scannerCommandQueue } from '../queue/scanner/scanner-command.queue.js';
 
 const controllerLogger = new PinoLogger('SubscriptionController');
 const sagaLogger = new PinoLogger('SubscriptionSaga');

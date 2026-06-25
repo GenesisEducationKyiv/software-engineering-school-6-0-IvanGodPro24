@@ -5,7 +5,7 @@ import {
 import { ILogger } from '@github-notifier/shared';
 import { ITrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
 import { ISubscriptionQueryRepository } from '../subscriptions/subscription-query.repository.js';
-import { IEmailQueue } from '../../queue/email-queue.port.js';
+import { IEmailQueue } from '../../queue/email/email-queue.port.js';
 
 export class ScannerEventHandler {
   constructor(

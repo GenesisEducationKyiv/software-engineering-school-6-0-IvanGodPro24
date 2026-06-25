@@ -12,7 +12,7 @@ import { SubscriptionSagaOrchestrator } from '../modules/subscriptions/saga/subs
 import { SubscriptionSagaRepository } from '../modules/subscriptions/saga/subscription-saga.repository.js';
 import { SubscriptionSagaCompensationService } from '../modules/subscriptions/saga/subscription-saga-compensation.service.js';
 import { IRepositoryVerifier } from '../modules/github/repository-verifier.port.js';
-import { IEmailQueue } from '../queue/email-queue.port.js';
+import { IEmailQueue } from '../queue/email/email-queue.port.js';
 import { ILogger } from '@github-notifier/shared';
 
 type AsyncMock<Args extends unknown[], Result> = jest.Mock<

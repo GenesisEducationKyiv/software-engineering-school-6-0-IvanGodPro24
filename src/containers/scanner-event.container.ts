@@ -4,8 +4,8 @@ import {
   trackedRepoRepository,
   subscriptionQueryRepository,
 } from './shared.container.js';
-import { emailQueue } from '../queue/email.queue.js';
-import { EmailQueueAdapter } from '../queue/email-queue.adapter.js';
+import { EmailQueueAdapter } from '../queue/email/email-queue.adapter.js';
+import { emailQueue } from '../queue/email/email.queue.js';
 import { ScannerEventHandler } from '../modules/scanner/scanner-event.handler.js';
 import { ScannerEventWorker } from '../modules/scanner/scanner-event.worker.js';
 

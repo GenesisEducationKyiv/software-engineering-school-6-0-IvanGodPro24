@@ -4,7 +4,7 @@ import { type TrackedRepoEntity } from '../modules/repositories/tracked-repo.ent
 import { SubscriptionService } from '../modules/subscriptions/subscription.service.js';
 import { ISubscriptionRepository } from '../modules/subscriptions/subscription.repository.js';
 import { ISubscriptionQueryRepository } from '../modules/subscriptions/subscription-query.repository.js';
-import { IScannerCommandPublisher } from '../queue/scanner-command-queue.port.js';
+import { IScannerCommandPublisher } from '../queue/scanner/scanner-command-queue.port.js';
 import {
   createSubscriptionEntity,
   createTrackedRepoEntity,
