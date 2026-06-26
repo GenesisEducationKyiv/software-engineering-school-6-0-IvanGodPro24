@@ -96,11 +96,13 @@ services:
     env_file: .env
     environment:
       SCANNER_SERVICE_REST_PORT: 3002
+      SCANNER_SERVICE_GRPC_PORT: 50051
       SCANNER_DATABASE_URL: postgresql://${SCANNER_POSTGRES_USER}:${SCANNER_POSTGRES_PASSWORD}@scanner_db:5432/${SCANNER_POSTGRES_DB}?schema=public
       REDIS_URL: redis://redis:6379
       NODE_ENV: production
     ports:
       - '3002:3002'
+      - '50051:50051'
 
   prometheus:
     image: prom/prometheus:latest
