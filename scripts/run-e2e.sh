@@ -47,6 +47,8 @@ export SMTP_HOST="localhost"
 export SMTP_PORT="1025"
 export SCANNER_SERVICE_REST_URL="http://localhost:3002"
 export SCANNER_SERVICE_REST_TIMEOUT_MS="5000"
+export SCANNER_SERVICE_GRPC_ADDRESS="localhost:50051"
+export SCANNER_SERVICE_GRPC_TIMEOUT_MS="5000"
 
 echo "Applying migrations..."
 npm run db:migrate

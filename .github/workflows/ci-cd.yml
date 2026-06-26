@@ -8,6 +8,8 @@ on:
 env:
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
   REDIS_URL: redis://localhost:6379
+  SCANNER_SERVICE_GRPC_ADDRESS: localhost:50051
+  SCANNER_SERVICE_GRPC_TIMEOUT_MS: 3000
   API_KEY: super-secret-key
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
   SMTP_HOST: smtp.mailtrap.io

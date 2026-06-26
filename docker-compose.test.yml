@@ -50,6 +50,7 @@ services:
         condition: service_started
     environment:
       SCANNER_SERVICE_REST_PORT: 3002
+      SCANNER_SERVICE_GRPC_PORT: 50051
       SCANNER_DATABASE_URL: postgresql://scanner_test:scanner_test_password@test_scanner_db:5432/scanner_test_db?schema=public
       REDIS_URL: redis://test_redis:6379
       GITHUB_API_TIMEOUT_MS: 5000
@@ -57,3 +58,4 @@ services:
       NODE_ENV: production
     ports:
       - '3002:3002'
+      - '50051:50051'

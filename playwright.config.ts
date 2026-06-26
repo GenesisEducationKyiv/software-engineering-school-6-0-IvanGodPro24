@@ -26,6 +26,8 @@ export default defineConfig({
         'postgresql://test_user:test_password@localhost:5434/test_db?schema=public',
       REDIS_URL: 'redis://localhost:6380',
       API_KEY: 'super-secret-key',
+      SCANNER_SERVICE_GRPC_ADDRESS: 'localhost:50051',
+      SCANNER_SERVICE_GRPC_TIMEOUT_MS: '5000',
     },
   },
 });

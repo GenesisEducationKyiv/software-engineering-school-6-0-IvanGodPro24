@@ -5,9 +5,9 @@ import { randomUUID } from 'node:crypto';
 
 const mockVerifyRepository = jest.fn<(...args: unknown[]) => Promise<void>>();
 jest.unstable_mockModule(
-  '../infrastructure/scanner/rest-repository-verifier.js',
+  '../infrastructure/scanner/grpc-repository-verifier.js',
   () => ({
-    RestRepositoryVerifier: class {
+    GrpcRepositoryVerifier: class {
       verifyRepository = mockVerifyRepository;
     },
   }),
