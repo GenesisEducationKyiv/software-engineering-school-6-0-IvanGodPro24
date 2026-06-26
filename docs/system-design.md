@@ -36,18 +36,20 @@
 
 ## 3. High-Level архітектура
 
-Система побудована як **модульний моноліт + окремий Notification Service**.
+Система побудована як **модульний моноліт + окремі Notification Service та GitHub Scanner Service**.
 
 Main API містить такі модулі:
 
 - **Subscriptions Module** — створення, підтвердження, скасування та перегляд підписок.
 - **Repositories Module** — робота з відстежуваними репозиторіями.
-- **Scanner Module** — періодична перевірка нових релізів.
-- **GitHub Module** — GitHub API та Redis-кешування.
+- **Scanner Module** — синхронізація tracked repositories зі scanner service та обробка scanner events.
+- **GitHub Module** — порт repository verification, який реалізується infrastructure adapter-ом.
 - **Saga Module** — координація асинхронного subscription flow і компенсація.
 - **Infrastructure Layer** — PostgreSQL, Redis, логування, метрики та Swagger.
 
 Notification Service є власником email-домену: шаблонів Handlebars, SMTP-інтеграції та обробки email jobs.
+
+GitHub Scanner Service є власником інтеграції з GitHub API для перевірки репозиторіїв і періодичного сканування релізів. Main API звертається до нього через gRPC для синхронної repository verification під час створення підписки. REST implementation у scanner service збережена для HTTP-сумісного доступу, health checks і ручної діагностики, але основний service-to-service шлях за замовчуванням — gRPC.
 
 ```mermaid
 graph TD
@@ -56,37 +58,53 @@ graph TD
     API[Main API<br/>Node.js / Express<br/>Modular Monolith]
     SubscriptionModule[Subscriptions Module]
     SagaOrchestrator[Subscription Saga Orchestrator]
-    Scanner[Scanner Module]
-    GitHubModule[GitHub Module]
     ResultWorker[Notification Result Worker]
+    ScannerEventWorker[Scanner Event Worker]
+    RepositoryVerifier[Repository Verifier<br/>gRPC client]
 
-    DB[(PostgreSQL<br/>Subscriptions, Repositories & Sagas)]
+    DB[(Main PostgreSQL<br/>Subscriptions, Repositories & Sagas)]
+    ScannerDB[(Scanner PostgreSQL<br/>Tracked repositories)]
     Redis[(Redis<br/>BullMQ backend & GitHub Cache)]
     EmailQueue[[email-queue]]
     ResultQueue[[notification-result-queue]]
+    ScannerCommandQueue[[scanner-command-queue]]
+    ScannerEventQueue[[scanner-event-queue]]
 
     NotificationService[Notification Service]
     EmailWorker[Email Worker]
     Templates[Handlebars Templates]
     SMTP([SMTP Provider])
+    ScannerService[GitHub Scanner Service<br/>REST + gRPC]
+    Scanner[Scanner Worker]
+    GitHubModule[GitHub Client + Redis Cache]
     GitHub([GitHub API])
 
     Client -- "POST /subscribe<br/>GET /confirm<br/>GET /unsubscribe" --> API
     API --> SubscriptionModule
     SubscriptionModule --> SagaOrchestrator
+    SagaOrchestrator -- "verify repository<br/>gRPC" --> RepositoryVerifier
+    RepositoryVerifier -- "RepositoryVerificationService.VerifyRepository" --> ScannerService
     SubscriptionModule -- "Read/Write" --> DB
     SagaOrchestrator -- "Read/Write Saga" --> DB
 
-    API --> Scanner
-    Scanner -- "Fetch active repositories" --> DB
+    ScannerService --> Scanner
+    Scanner -- "Fetch active repositories" --> ScannerDB
     Scanner -- "Check latest releases" --> GitHubModule
     GitHubModule -- "GitHub REST API" --> GitHub
     GitHubModule -- "ETag/latest tag cache" --> Redis
 
     SagaOrchestrator -- "confirm-subscription command" --> EmailQueue
-    Scanner -- "new-release command" --> EmailQueue
+    SagaOrchestrator -- "sync-repository-tracking command" --> ScannerCommandQueue
+    ScannerCommandQueue -- "Consume command" --> ScannerService
+    ScannerService -- "Read/Write tracked repositories" --> ScannerDB
+    Scanner -- "repository-tag-updated event" --> ScannerEventQueue
+    ScannerEventQueue -- "Consume event" --> ScannerEventWorker
+    ScannerEventWorker -- "new-release command" --> EmailQueue
+    ScannerEventWorker -- "Update repository projection" --> DB
     EmailQueue -- "BullMQ backend" --> Redis
     ResultQueue -- "BullMQ backend" --> Redis
+    ScannerCommandQueue -- "BullMQ backend" --> Redis
+    ScannerEventQueue -- "BullMQ backend" --> Redis
 
     NotificationService --> EmailWorker
     EmailQueue -- "Consume command" --> EmailWorker
@@ -98,8 +116,8 @@ graph TD
 
     classDef service fill:#f9f,stroke:#333,stroke-width:2px;
     classDef database fill:#bbf,stroke:#333,stroke-width:2px;
-    class API,NotificationService,EmailWorker,ResultWorker service;
-    class DB,Redis database;
+    class API,NotificationService,EmailWorker,ResultWorker,ScannerEventWorker,ScannerService service;
+    class DB,ScannerDB,Redis database;
 ```
 
 ### Межа між модулями та мікросервісом
@@ -113,6 +131,8 @@ new-release
 
 Notification Service не модифікує `Subscription`, `Repository` або `SubscriptionSaga` напряму. Результат confirmation email він повертає лише через спільні contracts і `notification-result-queue`.
 
+GitHub Scanner Service не створює підписки напряму. Для subscription flow він повертає лише результат repository verification. Main API сам вирішує, як перетворити gRPC статус scanner-а у HTTP відповідь клієнту.
+
 ---
 
 ## 4. Оркестрована Saga підписки
@@ -124,7 +144,7 @@ Client
   -> POST /api/subscribe
 
 Main API
-  -> validates repository in GitHub
+  -> validates repository through GitHub Scanner Service over gRPC
   -> creates SubscriptionSaga and PENDING Subscription in PostgreSQL
   -> publishes confirm-subscription command to email-queue
   -> returns 202 Accepted
@@ -184,17 +204,72 @@ Email jobs і result jobs мають до трьох спроб з exponential b
 
 ### 5.2. GitHub Scanner
 
-- Запускається через `node-cron` кожні 10 хвилин.
-- Отримує з БД унікальні репозиторії, що мають щонайменше одну активну підписку.
-- Викликає `GET /repos/{owner}/{repo}/releases/latest`, порівнює tag із `Repository.lastSeenTag` і використовує Redis для ETag-кешування.
-- За нового релізу оновлює `lastSeenTag` і створює `new-release` jobs для активних підписників.
+GitHub Scanner Service має власну таблицю `TrackedRepository` і запускає scheduled scan через `node-cron`.
 
-### 5.3. Черги та workers
+- Main API публікує `sync-repository-tracking` command у `scanner-command-queue`, коли repository має бути активований або деактивований у scanner service.
+- GitHub Scanner Service споживає command і синхронізує власну projection таблицю `TrackedRepository`.
+- Scanner періодично отримує активні tracked repositories зі своєї БД.
+- Для кожного repository він викликає `GET /repos/{owner}/{repo}/releases/latest`, порівнює tag із `TrackedRepository.lastSeenTag` і використовує Redis для ETag/latest tag кешування.
+- За нового релізу scanner service публікує `repository-tag-updated` event у `scanner-event-queue`.
+- Main API споживає scanner event, оновлює свою repository projection і створює `new-release` jobs для активних підписників.
 
-BullMQ використовує Redis як backend для двох черг:
+### 5.3. Repository verification через gRPC
+
+Під час `POST /api/subscribe` Main API синхронно перевіряє, що GitHub repository існує і доступний. За замовчуванням ця перевірка виконується через gRPC:
+
+```txt
+Main API
+  -> GrpcRepositoryVerifier
+  -> RepositoryVerificationService.VerifyRepository
+  -> GitHub Scanner Service
+  -> GitHub API
+```
+
+REST implementation у GitHub Scanner Service збережена, але Main API використовує `GrpcRepositoryVerifier` як основний adapter для repository verification.
+
+`.proto` файл є source of truth для RPC контракту:
+
+```txt
+proto/github/notifier/scanner/v1/repository_verification.proto
+```
+
+Buf відповідає за lint/generation:
+
+```txt
+buf lint
+buf generate
+```
+
+Generated TypeScript contracts зберігаються в `packages/scanner-contracts/src/generated` і використовуються обома сторонами:
+
+- Main API імпортує `RepositoryVerificationServiceClient`;
+- GitHub Scanner Service реалізує `RepositoryVerificationServiceServer`.
+
+Кожен RPC виклик має deadline через `CallOptions.deadline`; timeout задається `SCANNER_SERVICE_GRPC_TIMEOUT_MS`. Якщо scanner service не відповідає вчасно, Main API повертає клієнту HTTP `504`.
+
+GitHub Scanner Service перетворює domain errors у gRPC statuses, а Main API перетворює gRPC statuses у HTTP statuses:
+
+| Scanner gRPC status  | Main API HTTP status |
+| -------------------- | -------------------- |
+| `INVALID_ARGUMENT`   | `400`                |
+| `PERMISSION_DENIED`  | `403`                |
+| `NOT_FOUND`          | `404`                |
+| `RESOURCE_EXHAUSTED` | `429`                |
+| `DEADLINE_EXCEEDED`  | `504`                |
+| `UNAVAILABLE`        | `503`                |
+| `CANCELLED`          | `503`                |
+| інші статуси         | `502`                |
+
+Деталі рішення зафіксовані в [ADR-007](adr/0007-use-grpc-for-repository-verification.md).
+
+### 5.4. Черги та workers
+
+BullMQ використовує Redis як backend для service-to-service черг:
 
 - `email-queue` передає `confirm-subscription` і `new-release` commands із Main API до Notification Service;
 - `notification-result-queue` передає result events для confirmation email із Notification Service до Main API.
+- `scanner-command-queue` передає commands із Main API до GitHub Scanner Service для синхронізації tracked repositories;
+- `scanner-event-queue` передає repository scan events із GitHub Scanner Service до Main API.
 
 Email Worker ізольовує SMTP-відправлення від API і дозволяє незалежно масштабувати розсилку. Notification Result Worker завершує або компенсує Saga на підставі result event.
 

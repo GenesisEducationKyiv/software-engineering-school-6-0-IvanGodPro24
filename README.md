@@ -9,10 +9,11 @@ A robust, production-ready REST API that allows users to subscribe to email noti
 - **Subscription State Machine:** Implements state machine logic (`PENDING` → `ACTIVE` → `UNSUBSCRIBED`) to ensure data integrity and seamless re-subscriptions.
 - **Orchestrated Subscription Saga:** Coordinates subscription persistence and confirmation email delivery across the Main API and Notification Service. Successful delivery completes the Saga, while final delivery failure triggers compensation.
 - **Bidirectional Asynchronous Messaging:** Uses `email-queue` for commands and `notification-result-queue` for success/failure result events.
+- **gRPC Repository Verification:** The Main API verifies repositories through the GitHub Scanner Service over gRPC by default. The REST scanner endpoint is still available for HTTP compatibility, health checks, and diagnostics.
 - **Idempotent Email Result Handling:** Stores an `email-sent` BullMQ progress checkpoint and uses deterministic result job IDs to reduce duplicate confirmation emails and duplicate result events.
 - **Race Condition Protection:** Utilizes database-level unique constraints and Prisma operations to handle concurrent duplicate requests flawlessly.
-- **Modular Monolith + Microservice:** The main API is organized into clear modules (`subscriptions`, `repositories`, `scanner`, `github`, `notifications`, `infrastructure`), while the notification/email domain is extracted into a separate `notification-service`.
-- **Background Processing:** Uses `node-cron` for scheduled repository scanning and `BullMQ` + `Redis` for reliable asynchronous communication between the main API and the notification microservice.
+- **Modular Monolith + Microservices:** The main API is organized into clear modules (`subscriptions`, `repositories`, `scanner`, `github`, `notifications`, `infrastructure`), while email delivery and GitHub scanning are extracted into dedicated services.
+- **Background Processing:** Uses `node-cron` for scheduled repository scanning in the scanner service and `BullMQ` + `Redis` for reliable asynchronous communication between services.
 - **Rate Limit Handling:** Gracefully handles GitHub API `429 Too Many Requests` errors and caches API responses in Redis to minimize external calls.
 - **Production-Ready CI/CD:** Fully automated GitHub Actions pipeline (Build, Test) with zero-downtime deployment to Render via Deploy Hooks.
 
@@ -35,6 +36,7 @@ A robust, production-ready REST API that allows users to subscribe to email noti
 | Database         | PostgreSQL, Prisma ORM                  |
 | Caching & Queues | Redis, BullMQ, ioredis                  |
 | Mailing          | Nodemailer, Handlebars (HTML templates) |
+| Service RPC      | gRPC (`@grpc/grpc-js`), Protocol Buffers, Buf |
 | Testing          | Jest, ts-jest, Supertest, Playwright    |
 | Observability    | Prometheus (`prom-client`), Grafana     |
 | Containerization | Docker, Docker Compose                  |
@@ -95,6 +97,12 @@ API_KEY=your_super_secret_api_key
 # External APIs
 GH_TOKEN=your_github_personal_access_token
 
+# GitHub Scanner Service
+SCANNER_SERVICE_GRPC_ADDRESS=github-scanner-service:50051
+SCANNER_SERVICE_GRPC_TIMEOUT_MS=3000
+SCANNER_SERVICE_REST_URL=http://github-scanner-service:3002
+SCANNER_SERVICE_REST_TIMEOUT_MS=3000
+
 # SMTP Configuration (see "Choosing an SMTP Service" below)
 SMTP_FROM=your_email@gmail.com
 SMTP_HOST=smtp-relay.brevo.com
@@ -124,7 +132,8 @@ Docker will automatically:
 2. Run Prisma migrations (`npm run db:migrate`)
 3. Start the API server on port `3000`
 4. Start the Notification Service for email delivery
-5. Launch Redis, Prometheus, Grafana, and the logging stack
+5. Start the GitHub Scanner Service with REST and gRPC endpoints
+6. Launch Redis, Prometheus, Grafana, and the logging stack
 
 ---
 
@@ -155,7 +164,7 @@ The project includes a fully configured monitoring stack:
 
 In Grafana, add `http://prometheus:9090` as a Prometheus data source to visualize HTTP request durations, memory usage, and Event Loop lag.
 
-> A **BullMQ Dashboard** is also available at [http://localhost:3000/admin/queues](http://localhost:3000/admin/queues). It exposes both `email-queue` and `notification-result-queue`, allowing the complete Saga command/result flow to be monitored in real time.
+> A **BullMQ Dashboard** is also available at [http://localhost:3000/admin/queues](http://localhost:3000/admin/queues). It exposes the email, notification result, and scanner queues used by the distributed flows.
 
 ---
 
@@ -190,10 +199,10 @@ src/
 │   └── swagger/             # Swagger UI setup
 ├── middleware/              # Express middleware
 ├── modules/                 # Modular monolith business modules
-│   ├── github/              # GitHub API integration
+│   ├── github/              # Repository verifier port
 │   ├── notifications/       # Queue job contracts
 │   ├── repositories/        # Tracked GitHub repositories
-│   ├── scanner/             # Release scanning logic
+│   ├── scanner/             # Scanner command/event handling
 │   └── subscriptions/       # Subscription business flow
 ├── queue/                   # BullMQ command and result queues
 ├── routes/                  # Root API router
@@ -201,18 +210,33 @@ src/
 └── index.ts                 # Main API entry point
 
 services/
-└── notification-service/    # Extracted notification microservice
+├── notification-service/    # Extracted notification microservice
+│   ├── src/
+│   │   ├── templates/       # Handlebars email templates
+│   │   ├── email.service.ts
+│   │   ├── email.worker.ts
+│   │   ├── notification-result.publisher.ts
+│   │   ├── index.ts
+│   │   └── subscription-email.service.ts
+│   ├── Dockerfile
+│   ├── package.json
+│   └── tsconfig.json
+└── github-scanner-service/  # GitHub repository verification and release scanner
     ├── src/
-    │   ├── templates/       # Handlebars email templates
-    │   ├── email.service.ts
-    │   ├── email.worker.ts
-    │   ├── notification-result.publisher.ts
-    │   ├── index.ts
-    │   └── subscription-email.service.ts
+    │   ├── grpc/            # gRPC server adapter
+    │   ├── routes/          # REST endpoints and health checks
+    │   ├── github/          # GitHub API client
+    │   └── index.ts
     ├── Dockerfile
     ├── package.json
     └── tsconfig.json
 
+packages/
+├── scanner-contracts/       # Scanner queues and generated gRPC contracts
+├── notification-contracts/  # Notification queue contracts
+└── shared/                  # Shared logger/env/domain utilities
+
+proto/                       # Protocol Buffers source of truth for gRPC APIs
 public/                      # Static subscription page used by the app and E2E tests
 e2e/                         # Playwright end-to-end tests
 scripts/                     # Test runner helper scripts
@@ -222,11 +246,35 @@ docs/                        # OpenAPI docs, ADRs, and system design
 
 ### Architecture Summary
 
-The project now follows a **modular monolith + microservice** approach.
+The project now follows a **modular monolith + microservices** approach.
 
-The root application is responsible for subscription management, GitHub repository tracking, scheduled scanning, API endpoints, persistence, and publishing notification jobs.
+The root application is responsible for subscription management, API endpoints, persistence, subscription Saga orchestration, consuming notification results, and publishing notification jobs.
 
 The extracted `notification-service` is responsible for consuming email jobs from Redis/BullMQ, rendering email templates, and sending emails through SMTP. The main API no longer owns Nodemailer, SMTP integration, or email templates.
+
+The extracted `github-scanner-service` is responsible for GitHub repository verification and scheduled release scanning. The Main API uses gRPC by default for repository verification. The scanner REST implementation is still available for HTTP compatibility, health checks, and diagnostics.
+
+### gRPC Repository Verification
+
+The gRPC contract is defined in:
+
+```txt
+proto/github/notifier/scanner/v1/repository_verification.proto
+```
+
+This `.proto` file is the source of truth. Buf lints and generates TypeScript contracts into `packages/scanner-contracts/src/generated`, which are consumed by both the Main API client and GitHub Scanner Service server.
+
+Useful commands:
+
+```bash
+npm run proto:lint
+npm run proto:generate
+npm run proto:check
+```
+
+Each Main API RPC call uses a deadline configured by `SCANNER_SERVICE_GRPC_TIMEOUT_MS`. gRPC errors from the scanner are mapped back to HTTP errors in the Main API, for example `NOT_FOUND -> 404`, `RESOURCE_EXHAUSTED -> 429`, `UNAVAILABLE -> 503`, and `DEADLINE_EXCEEDED -> 504`.
+
+See [ADR-007](docs/adr/0007-use-grpc-for-repository-verification.md) for the full decision record.
 
 ### Orchestrated Subscription Saga
 
@@ -269,7 +317,7 @@ A completed Saga does not mean that the subscription is already active. It means
 Redis is used in two separate roles:
 
 1. **Cache storage** for GitHub API responses. This reduces repeated external calls and helps the app handle GitHub API rate limits more gracefully.
-2. **Message broker backend** for BullMQ queues. BullMQ stores email jobs in Redis so they can be processed asynchronously by the notification microservice.
+2. **Message broker backend** for BullMQ queues. BullMQ stores email, notification result, scanner command, and scanner event jobs in Redis so they can be processed asynchronously by the responsible services.
 
 The email delivery flow is:
 
@@ -286,3 +334,5 @@ Main API
 ```
 
 This keeps HTTP request handling independent from email delivery. If SMTP is slow or temporarily unavailable, the API can still publish a job quickly, while BullMQ handles retries and the Notification Service processes the queue separately.
+
+Scanner queues follow the same pattern: Main API publishes repository tracking commands, GitHub Scanner Service scans active repositories, and scanner events return to Main API for repository projection updates and release notification jobs.
