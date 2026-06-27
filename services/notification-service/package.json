@@ -15,7 +15,7 @@
     "bullmq": "^5.73.4",
     "handlebars": "^4.7.9",
     "ioredis": "5.10.1",
-    "nodemailer": "^8.0.5"
+    "nodemailer": "^9.0.1"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
