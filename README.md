@@ -276,6 +276,34 @@ Each Main API RPC call uses a deadline configured by `SCANNER_SERVICE_GRPC_TIMEO
 
 See [ADR-007](docs/adr/0007-use-grpc-for-repository-verification.md) for the full decision record.
 
+### REST vs gRPC Repository Verification Benchmark
+
+As an extra benchmark, repository verification was measured locally for both implementations:
+
+- REST: `autocannon`
+- gRPC: `ghz`
+- Business logic: the same `RepositoryVerificationService`
+- External GitHub API: disabled through a local benchmark adapter
+- Input: `facebook/react`
+- Concurrency: `50`
+- Duration: `30s`
+- TLS: disabled
+- Machine: same local machine
+- Warm-up: performed before measured runs
+
+The goal was to compare the transport overhead of the REST and gRPC implementations, not GitHub API latency or rate limiting.
+
+| Transport | Tool | Requests/sec | Total requests | p50 latency | p95 latency | p99 latency | Errors |
+| --------- | ---- | ------------ | -------------- | ----------- | ----------- | ----------- | ------ |
+| REST | autocannon | ~15,174 req/s | ~455k | 2 ms | n/a | 6 ms | 0 |
+| gRPC | ghz | ~38,474 req/s | 1,154,224 | 0.98 ms | 2.18 ms | 3.47 ms | 50 `Unavailable` |
+
+In this local benchmark, gRPC achieved about **2.5x higher throughput** and lower median/tail latency than REST. The likely reason is that gRPC uses a persistent HTTP/2 connection with multiplexed RPC streams and compact Protobuf messages, while the REST endpoint goes through Express JSON parsing and HTTP/1.1 request handling.
+
+The gRPC run reported 50 `Unavailable` responses out of 1,154,224 total requests, which is about **0.0043%**. These errors happened at the end of the fixed-duration run when `ghz` closed the connection while some RPCs were still in flight, so they were treated as a benchmark shutdown artifact rather than application-level failures.
+
+These numbers are local and should not be interpreted as production capacity. In the real subscription flow, repository verification is dominated by GitHub API latency unless responses are mocked or cached.
+
 ### Orchestrated Subscription Saga
 
 Creating a subscription is now an asynchronous distributed process coordinated by the Main API.
