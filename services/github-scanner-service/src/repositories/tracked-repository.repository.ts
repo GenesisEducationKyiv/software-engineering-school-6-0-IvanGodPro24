@@ -1,18 +1,6 @@
 import { PrismaClient } from '../generated/prisma/client.js';
 import { TrackedRepositoryEntity } from '../domain/tracked-repository.entity.js';
-
-export interface ITrackedRepositoryRepository {
-  activate(
-    sourceRepositoryId: string,
-    repoName: string,
-  ): Promise<TrackedRepositoryEntity>;
-
-  deactivate(sourceRepositoryId: string, repoName: string): Promise<void>;
-
-  findActive(): Promise<TrackedRepositoryEntity[]>;
-
-  updateLastSeenTag(id: string, tag: string): Promise<void>;
-}
+import { ITrackedRepositoryRepository } from '../app/tracked-repository.repository.port.js';
 
 export class TrackedRepositoryRepository implements ITrackedRepositoryRepository {
   constructor(private readonly db: PrismaClient) {}

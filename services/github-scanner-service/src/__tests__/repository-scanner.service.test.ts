@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import { RepositoryScannerService } from '../app/repository-scanner.service.js';
-import { ITrackedRepositoryRepository } from '../repositories/tracked-repository.repository.js';
+import { ITrackedRepositoryRepository } from '../app/tracked-repository.repository.port.js';
 import { IGitHubReleaseClient } from '../app/github-release-client.port.js';
 import { IScannerEventPublisher } from '../app/scanner-event-publisher.port.js';
 import { ILogger } from '@github-notifier/shared';
