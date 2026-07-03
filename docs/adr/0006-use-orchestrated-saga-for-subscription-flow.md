@@ -223,6 +223,5 @@ SMTP успішно відправив email
 * idempotency key, який підтримує email provider;
 * persistent email delivery record;
 * transactional outbox;
-* спеціалізованого email-провайдера з idempotent delivery API.
 
 Для production-рівня надійності ці failure windows потребують transactional outbox з окремим dispatcher-ом або процесу відновлення Saga, що зависли у проміжних станах. Для поточного проекту BullMQ progress checkpoint та детерміновані result job IDs є компромісом між надійністю та складністю.
