@@ -22,6 +22,13 @@ export class NotificationResultHandler {
           event.errorMessage,
         );
         return;
+
+      default:
+        this.logger.error(
+          { event },
+          `Unsupported event type received: ${event}`,
+        );
+        throw new Error(`Unsupported event type: ${event}`);
     }
   }
 
