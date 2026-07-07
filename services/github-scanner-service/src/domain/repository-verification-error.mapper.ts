@@ -1,50 +1,28 @@
 import { status } from '@grpc/grpc-js';
 import { RepositoryVerificationErrorCode } from './repository-verification.error.js';
 
+const httpStatusMap: Record<RepositoryVerificationErrorCode, number> = {
+  INVALID_ARGUMENT: 400,
+  NOT_FOUND: 404,
+  PERMISSION_DENIED: 403,
+  RESOURCE_EXHAUSTED: 429,
+  UNAVAILABLE: 503,
+  INTERNAL: 500,
+};
+
 export const mapRepositoryVerificationErrorCodeToHttpStatus = (
   code: RepositoryVerificationErrorCode,
-): number => {
-  switch (code) {
-    case 'INVALID_ARGUMENT':
-      return 400;
+): number => httpStatusMap[code];
 
-    case 'NOT_FOUND':
-      return 404;
-
-    case 'PERMISSION_DENIED':
-      return 403;
-
-    case 'RESOURCE_EXHAUSTED':
-      return 429;
-
-    case 'UNAVAILABLE':
-      return 503;
-
-    case 'INTERNAL':
-      return 500;
-  }
+const grpcStatusMap: Record<RepositoryVerificationErrorCode, status> = {
+  INVALID_ARGUMENT: status.INVALID_ARGUMENT,
+  NOT_FOUND: status.NOT_FOUND,
+  PERMISSION_DENIED: status.PERMISSION_DENIED,
+  RESOURCE_EXHAUSTED: status.RESOURCE_EXHAUSTED,
+  UNAVAILABLE: status.UNAVAILABLE,
+  INTERNAL: status.INTERNAL,
 };
 
 export const mapRepositoryVerificationErrorCodeToGrpcStatus = (
   code: RepositoryVerificationErrorCode,
-): status => {
-  switch (code) {
-    case 'INVALID_ARGUMENT':
-      return status.INVALID_ARGUMENT;
-
-    case 'NOT_FOUND':
-      return status.NOT_FOUND;
-
-    case 'PERMISSION_DENIED':
-      return status.PERMISSION_DENIED;
-
-    case 'RESOURCE_EXHAUSTED':
-      return status.RESOURCE_EXHAUSTED;
-
-    case 'UNAVAILABLE':
-      return status.UNAVAILABLE;
-
-    case 'INTERNAL':
-      return status.INTERNAL;
-  }
-};
+): status => grpcStatusMap[code];

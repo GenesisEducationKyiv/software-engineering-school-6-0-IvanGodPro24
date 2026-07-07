@@ -13,7 +13,7 @@ import {
 import { ILogger } from '@github-notifier/shared';
 import { IRepositoryVerificationService } from '../app/repository-verification.service.js';
 import { RepositoryVerificationGrpcService } from '../grpc/repository-verification.grpc-service.js';
-import { RepositoryVerificationError } from '../domain/repository-verification.error.js';
+import { RepositoryVerificationError, RepositoryVerificationErrorCodes } from '../domain/repository-verification.error.js';
 
 const verificationService = {
   verify: jest.fn(),
@@ -132,7 +132,10 @@ describe('Repository verification gRPC integration', () => {
     if (!grpcClient) throw new Error('gRPC client is not initialized');
 
     verificationService.verify.mockRejectedValue(
-      new RepositoryVerificationError('NOT_FOUND', 'Repository not found'),
+      new RepositoryVerificationError(
+        RepositoryVerificationErrorCodes.NOT_FOUND,
+        'Repository not found',
+      ),
     );
 
     const error = await new Promise<ServiceError>((resolve, reject) => {

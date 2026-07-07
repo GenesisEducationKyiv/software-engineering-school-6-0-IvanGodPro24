@@ -6,7 +6,10 @@ import {
 } from '@github-notifier/scanner-contracts';
 import { ILogger } from '@github-notifier/shared';
 import { IRepositoryVerificationService } from '../app/repository-verification.service.js';
-import { RepositoryVerificationError } from '../domain/repository-verification.error.js';
+import {
+  RepositoryVerificationError,
+  RepositoryVerificationErrorCodes,
+} from '../domain/repository-verification.error.js';
 import { RepositoryVerificationGrpcService } from '../grpc/repository-verification.grpc-service.js';
 
 const verificationService = {
@@ -89,7 +92,10 @@ describe('RepositoryVerificationGrpcService', () => {
 
   it('maps repository not found to gRPC NOT_FOUND', async () => {
     verificationService.verify.mockRejectedValue(
-      new RepositoryVerificationError('NOT_FOUND', 'Repository not found'),
+      new RepositoryVerificationError(
+        RepositoryVerificationErrorCodes.NOT_FOUND,
+        'Repository not found',
+      ),
     );
 
     const { callback, called } = createCallback();
@@ -115,7 +121,7 @@ describe('RepositoryVerificationGrpcService', () => {
   it('maps GitHub rate limit to gRPC RESOURCE_EXHAUSTED', async () => {
     verificationService.verify.mockRejectedValue(
       new RepositoryVerificationError(
-        'RESOURCE_EXHAUSTED',
+        RepositoryVerificationErrorCodes.RESOURCE_EXHAUSTED,
         'GitHub rate limit exceeded',
       ),
     );
