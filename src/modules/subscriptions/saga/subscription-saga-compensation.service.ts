@@ -54,15 +54,14 @@ export class SubscriptionSagaCompensationService {
     }
 
     if (saga.createdRepository && saga.repositoryId) {
-      const subscriptionsCount = await this.prisma.subscription.count({
-        where: { repositoryId: saga.repositoryId },
+      await this.prisma.repository.deleteMany({
+        where: {
+          id: saga.repositoryId,
+          subscriptions: {
+            none: {},
+          },
+        },
       });
-
-      if (subscriptionsCount === 0) {
-        await this.prisma.repository.deleteMany({
-          where: { id: saga.repositoryId },
-        });
-      }
     }
 
     await this.sagaRepository.markCompensated(sagaId, errorMessage);
