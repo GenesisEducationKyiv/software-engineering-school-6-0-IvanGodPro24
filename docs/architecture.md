@@ -251,83 +251,11 @@ Notification Service responsibilities:
 - Publishes success or failure result events for confirmation email delivery.
 - Does not modify Main API database state directly.
 
-## 5. Main Runtime Flows
-
-### 5.1. Subscribe Flow
-
-```mermaid
-sequenceDiagram
-    actor User
-    participant Main as Main API
-    participant Scanner as GitHub Scanner Service
-    participant DB as Main PostgreSQL
-    participant Redis as Redis / BullMQ
-    participant Mail as Notification Service
-    participant SMTP as SMTP Provider
-
-    User->>Main: POST /api/subscribe
-    Main->>Scanner: VerifyRepository gRPC
-    Scanner-->>Main: repository is valid
-    Main->>DB: create or reuse Repository
-    Main->>DB: create PENDING Subscription
-    Main->>DB: create SubscriptionSaga
-    Main->>Redis: publish confirm-subscription email job
-    Main-->>User: 202 Accepted
-
-    Mail->>Redis: consume email job
-    Mail->>SMTP: send confirmation email
-    SMTP-->>Mail: accepted or failed
-    Mail->>Redis: publish notification result event
-    Main->>Redis: consume result event
-    Main->>DB: complete saga or compensate local changes
-```
-
-### 5.2. New Release Flow
-
-```mermaid
-sequenceDiagram
-    participant Scanner as GitHub Scanner Service
-    participant ScannerDB as Scanner PostgreSQL
-    participant GitHub as GitHub API
-    participant Redis as Redis / BullMQ
-    participant Main as Main API
-    participant DB as Main PostgreSQL
-    participant Mail as Notification Service
-    participant SMTP as SMTP Provider
-
-    Scanner->>ScannerDB: load active tracked repositories
-    Scanner->>GitHub: get latest release
-    GitHub-->>Scanner: latest tag
-    Scanner->>ScannerDB: update last seen tag
-    Scanner->>Redis: publish repository-tag-updated event
-    Main->>Redis: consume scanner event
-    Main->>DB: load active subscriptions
-    Main->>DB: update repository projection
-    Main->>Redis: publish new-release email jobs
-    Mail->>Redis: consume email jobs
-    Mail->>SMTP: send release notifications
-```
-
-## 6. Data Ownership
-
-| Data | Owner | Storage |
-| --- | --- | --- |
-| Subscriptions | Main API | Main PostgreSQL, `Subscription` table |
-| Main repository projection | Main API | Main PostgreSQL, `Repository` table |
-| Subscription Saga state | Main API | Main PostgreSQL, `SubscriptionSaga` table |
-| Scanner tracked repository projection | GitHub Scanner Service | Scanner PostgreSQL, `TrackedRepository` table |
-| Email jobs | Main API produces, Notification Service consumes | Redis / BullMQ |
-| Notification result events | Notification Service produces, Main API consumes | Redis / BullMQ |
-| Scanner commands | Main API produces, GitHub Scanner Service consumes | Redis / BullMQ |
-| Scanner events | GitHub Scanner Service produces, Main API consumes | Redis / BullMQ |
-| gRPC repository verification contract | Shared scanner contracts package and proto file | `proto/`, `packages/scanner-contracts` |
-| Queue event contracts | Shared contracts packages | `packages/notification-contracts`, `packages/scanner-contracts` |
-
-## 7. Layering
+## 5. Layering
 
 The codebase follows a pragmatic layered architecture. The current folder structure does not use one global `domain/application/infrastructure` tree for every service, but the dependency direction is still explicit.
 
-### 7.1. Main API Layers
+### 5.1. Main API Layers
 
 | Layer | Paths | Responsibility |
 | --- | --- | --- |
@@ -358,7 +286,7 @@ Main API rules:
 - Infrastructure adapters may depend on domain ports and implement them.
 - Composition code may import any layer because it wires dependencies together.
 
-### 7.2. GitHub Scanner Service Layers
+### 5.2. GitHub Scanner Service Layers
 
 | Layer | Paths | Responsibility |
 | --- | --- | --- |
@@ -375,7 +303,7 @@ Scanner rules:
 - Transport adapters convert HTTP/gRPC-specific errors to application/domain errors and back.
 - Infrastructure implements ports and performs external I/O.
 
-### 7.3. Notification Service Layers
+### 5.3. Notification Service Layers
 
 | Layer | Paths | Responsibility |
 | --- | --- | --- |
@@ -389,7 +317,7 @@ Notification rules:
 - It never imports Main API modules or writes to Main API database tables.
 - It reports confirmation email outcomes only through `notification-result-queue`.
 
-## 8. Shared Contracts
+## 6. Shared Contracts
 
 Shared contracts are isolated in workspace packages:
 
@@ -405,7 +333,7 @@ The `.proto` file is the source of truth for gRPC repository verification:
 proto/github/notifier/scanner/v1/repository_verification.proto
 ```
 
-## 9. Architecture Test Targets
+## 7. Architecture Test Targets
 
 Architecture tests for this codebase verify that:
 
@@ -417,7 +345,7 @@ Architecture tests for this codebase verify that:
 - GitHub Scanner Service implementation remains independent from the Main API and Notification Service implementation.
 - Shared packages do not import application or service implementation code.
 
-## 10. Related Documents
+## 8. Related Documents
 
 - [System Design](system-design.md)
 - [ADR-001: Use PostgreSQL for Database](adr/0001-use-postgresql-for-database.md)

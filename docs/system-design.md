@@ -192,9 +192,81 @@ Email jobs і result jobs мають до трьох спроб з exponential b
 
 ---
 
-## 5. Детальний дизайн компонентів
+## 5. Динаміка взаємодії (Main Runtime Flows)
 
-### 5.1. API Service
+### 5.1. Subscribe Flow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Main as Main API
+    participant Scanner as GitHub Scanner Service
+    participant DB as Main PostgreSQL
+    participant Redis as Redis / BullMQ
+    participant Mail as Notification Service
+    participant SMTP as SMTP Provider
+
+    User->>Main: POST /api/subscribe
+    Main->>Scanner: VerifyRepository gRPC
+    Scanner-->>Main: repository is valid
+    Main->>DB: create or reuse Repository
+    Main->>DB: create PENDING Subscription
+    Main->>DB: create SubscriptionSaga
+    Main->>Redis: publish confirm-subscription email job
+    Main-->>User: 202 Accepted
+
+    Mail->>Redis: consume email job
+    Mail->>SMTP: send confirmation email
+    SMTP-->>Mail: accepted or failed
+    Mail->>Redis: publish notification result event
+    Main->>Redis: consume result event
+    Main->>DB: complete saga or compensate local changes
+```
+
+### 5.2. New Release Flow
+
+```mermaid
+sequenceDiagram
+    participant Scanner as GitHub Scanner Service
+    participant ScannerDB as Scanner PostgreSQL
+    participant GitHub as GitHub API
+    participant Redis as Redis / BullMQ
+    participant Main as Main API
+    participant DB as Main PostgreSQL
+    participant Mail as Notification Service
+    participant SMTP as SMTP Provider
+
+    Scanner->>ScannerDB: load active tracked repositories
+    Scanner->>GitHub: get latest release
+    GitHub-->>Scanner: latest tag
+    Scanner->>ScannerDB: update last seen tag
+    Scanner->>Redis: publish repository-tag-updated event
+    Main->>Redis: consume scanner event
+    Main->>DB: load active subscriptions
+    Main->>DB: update repository projection
+    Main->>Redis: publish new-release email jobs
+    Mail->>Redis: consume email jobs
+    Mail->>SMTP: send release notifications
+```
+
+## 6. Володіння даними (Data Ownership)
+
+| Data                                  | Owner                                              | Storage                                                         |
+| ------------------------------------- | -------------------------------------------------- | --------------------------------------------------------------- |
+| Subscriptions                         | Main API                                           | Main PostgreSQL, `Subscription` table                           |
+| Main repository projection            | Main API                                           | Main PostgreSQL, `Repository` table                             |
+| Subscription Saga state               | Main API                                           | Main PostgreSQL, `SubscriptionSaga` table                       |
+| Scanner tracked repository projection | GitHub Scanner Service                             | Scanner PostgreSQL, `TrackedRepository` table                   |
+| Email jobs                            | Main API produces, Notification Service consumes   | Redis / BullMQ                                                  |
+| Notification result events            | Notification Service produces, Main API consumes   | Redis / BullMQ                                                  |
+| Scanner commands                      | Main API produces, GitHub Scanner Service consumes | Redis / BullMQ                                                  |
+| Scanner events                        | GitHub Scanner Service produces, Main API consumes | Redis / BullMQ                                                  |
+| gRPC repository verification contract | Shared scanner contracts package and proto file    | `proto/`, `packages/scanner-contracts`                          |
+| Queue event contracts                 | Shared contracts packages                          | `packages/notification-contracts`, `packages/scanner-contracts` |
+
+## 7. Детальний дизайн компонентів
+
+### 7.1. API Service
 
 - **Стек:** Node.js, Express, Zod.
 - `POST /api/subscribe` запускає Saga та повертає `202 Accepted` після постановки confirmation email command у BullMQ.
@@ -202,7 +274,7 @@ Email jobs і result jobs мають до трьох спроб з exponential b
 - `GET /api/unsubscribe/:token` переводить підписку в `UNSUBSCRIBED`.
 - `GET /api/subscriptions?email=<email>` повертає підписки користувача; endpoint захищений заголовком `x-api-key`.
 
-### 5.2. GitHub Scanner
+### 7.2. GitHub Scanner
 
 GitHub Scanner Service має власну таблицю `TrackedRepository` і запускає scheduled scan через `node-cron`.
 
@@ -213,7 +285,7 @@ GitHub Scanner Service має власну таблицю `TrackedRepository` і
 - За нового релізу scanner service публікує `repository-tag-updated` event у `scanner-event-queue`.
 - Main API споживає scanner event, оновлює свою repository projection і створює `new-release` jobs для активних підписників.
 
-### 5.3. Repository verification через gRPC
+### 7.3. Repository verification через gRPC
 
 Під час `POST /api/subscribe` Main API синхронно перевіряє, що GitHub repository існує і доступний. За замовчуванням ця перевірка виконується через gRPC:
 
@@ -262,7 +334,7 @@ GitHub Scanner Service перетворює domain errors у gRPC statuses, а M
 
 Деталі рішення зафіксовані в [ADR-007](adr/0007-use-grpc-for-repository-verification.md).
 
-### 5.4. Черги та workers
+### 7.4. Черги та workers
 
 BullMQ використовує Redis як backend для service-to-service черг:
 
@@ -275,7 +347,7 @@ Email Worker ізольовує SMTP-відправлення від API і до
 
 ---
 
-## 6. Схема бази даних
+## 8. Схема бази даних
 
 `Repository` зберігає унікальні GitHub-репозиторії та стан моніторингу. `Subscription` зберігає email і статус підписки. `SubscriptionSaga` зберігає стан розподіленої операції створення підписки.
 
