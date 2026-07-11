@@ -8,6 +8,8 @@ on:
 env:
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
   REDIS_URL: redis://localhost:6379
+  SCANNER_SERVICE_GRPC_ADDRESS: localhost:50051
+  SCANNER_SERVICE_GRPC_TIMEOUT_MS: 3000
   API_KEY: super-secret-key
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
   SMTP_HOST: smtp.mailtrap.io
@@ -34,6 +36,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint Protobuf contracts
+        run: npm run proto:lint
+
+      - name: Verify generated gRPC contracts
+        run: |
+          npm run proto:generate
+          git diff --exit-code -- packages/scanner-contracts/src/generated
+
       - name: Build shared packages
         run: npm run build:packages
 
@@ -48,6 +58,11 @@ jobs:
 
       - name: Build notification service
         run: npm run build:notification-service
+
+      - name: Build GitHub scanner service
+        run: npm run build:github-scanner-service
+        env:
+          SCANNER_DATABASE_URL: postgresql://scanner:scanner@localhost:5432/test
 
   notification-service-tests:
     name: Notification Service Tests
@@ -73,6 +88,35 @@ jobs:
       - name: Run notification service tests
         run: npm run test:notification-service
 
+  github-scanner-service-tests:
+    name: GitHub Scanner Service Tests
+    runs-on: ubuntu-latest
+    needs: lint-and-build
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared packages
+        run: npm run build:packages
+
+      - name: Generate Scanner Prisma client
+        run: npm run db:generate:scanner
+        env:
+          SCANNER_DATABASE_URL: postgresql://scanner:scanner@localhost:5432/test
+
+      - name: Run GitHub scanner service tests
+        run: npm run test:github-scanner-service
+
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -90,6 +134,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Build shared packages
+        run: npm run build:packages
 
       - name: Generate Prisma client
         run: npm run db:generate
@@ -162,7 +209,13 @@ jobs:
   cd:
     name: Deploy
     needs:
-      [unit-tests, integration-tests, e2e-tests, notification-service-tests]
+      [
+        unit-tests,
+        integration-tests,
+        e2e-tests,
+        notification-service-tests,
+        github-scanner-service-tests,
+      ]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
 

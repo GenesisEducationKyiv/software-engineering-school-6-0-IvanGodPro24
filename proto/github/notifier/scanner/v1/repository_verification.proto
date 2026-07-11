@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package github.notifier.scanner.v1;
+
+service RepositoryVerificationService {
+  rpc VerifyRepository(VerifyRepositoryRequest)
+      returns (VerifyRepositoryResponse);
+}
+
+message VerifyRepositoryRequest {
+  string owner = 1;
+  string repository = 2;
+}
+
+message VerifyRepositoryResponse {
+  string full_name = 1;
+}

@@ -3,17 +3,19 @@ import createHttpError from 'http-errors';
 import request from 'supertest';
 import { randomUUID } from 'node:crypto';
 
-const mockCheckRepoExists = jest.fn<(...args: unknown[]) => Promise<void>>();
-jest.unstable_mockModule('../modules/github/github.service.js', () => ({
-  GitHubClient: class {
-    checkRepoExists = mockCheckRepoExists;
-    getLatestRelease = jest.fn();
-  },
-}));
+const mockVerifyRepository = jest.fn<(...args: unknown[]) => Promise<void>>();
+jest.unstable_mockModule(
+  '../infrastructure/scanner/grpc-repository-verifier.js',
+  () => ({
+    GrpcRepositoryVerifier: class {
+      verifyRepository = mockVerifyRepository;
+    },
+  }),
+);
 
 const mockAddEmail = jest.fn<(...args: unknown[]) => Promise<void>>();
 const mockAddBulkEmails = jest.fn<(...args: unknown[]) => Promise<void>>();
-jest.unstable_mockModule('../queue/email-queue.adapter.js', () => ({
+jest.unstable_mockModule('../queue/email/email-queue.adapter.js', () => ({
   EmailQueueAdapter: class {
     addEmail = mockAddEmail;
     addBulkEmails = mockAddBulkEmails;
@@ -23,7 +25,11 @@ jest.unstable_mockModule('../queue/email-queue.adapter.js', () => ({
 const { app } = await import('../index.js');
 const { prisma } = await import('../infrastructure/db/client.js');
 const { redis } = await import('../infrastructure/redis/redis.js');
-const { emailQueue } = await import('../queue/email.queue.js');
+const { emailQueue } = await import('../queue/email/email.queue.js');
+const { scannerCommandQueue } =
+  await import('../queue/scanner/scanner-command.queue.js');
+const { scannerEventQueue } =
+  await import('../queue/scanner/scanner-event.queue.js');
 
 async function seedSubscription(
   email: string,
@@ -54,12 +60,14 @@ describe('Integration Tests: API Endpoints', () => {
   afterAll(async () => {
     await prisma.$disconnect();
     await emailQueue.close();
+    await scannerCommandQueue.close();
+    await scannerEventQueue.close();
     await redis.quit();
   });
 
   describe('POST /api/subscribe', () => {
     it('returns 202, creates saga, repository and subscription if the data is valid', async () => {
-      mockCheckRepoExists.mockResolvedValue(undefined);
+      mockVerifyRepository.mockResolvedValue(undefined);
 
       const testEmail = `test-${randomUUID()}@example.com`;
       const testRepo = `golang/go-${randomUUID()}`;
@@ -121,7 +129,7 @@ describe('Integration Tests: API Endpoints', () => {
     });
 
     it('returns 404 if repository does not exist on GitHub', async () => {
-      mockCheckRepoExists.mockRejectedValue(
+      mockVerifyRepository.mockRejectedValue(
         createHttpError(404, 'Repository not found'),
       );
 
@@ -145,7 +153,7 @@ describe('Integration Tests: API Endpoints', () => {
     });
 
     it('returns 409 if subscription is already PENDING', async () => {
-      mockCheckRepoExists.mockResolvedValue(undefined);
+      mockVerifyRepository.mockResolvedValue(undefined);
 
       const testEmail = `test-${randomUUID()}@example.com`;
       const testRepo = `test/repo-${randomUUID()}`;
@@ -168,7 +176,7 @@ describe('Integration Tests: API Endpoints', () => {
     });
 
     it('returns 409 if subscription is already ACTIVE', async () => {
-      mockCheckRepoExists.mockResolvedValue(undefined);
+      mockVerifyRepository.mockResolvedValue(undefined);
 
       const testEmail = `test-${randomUUID()}@example.com`;
       const testRepo = `test/repo-${randomUUID()}`;
@@ -191,7 +199,7 @@ describe('Integration Tests: API Endpoints', () => {
     });
 
     it('returns 202, updates status to PENDING and starts saga if UNSUBSCRIBED', async () => {
-      mockCheckRepoExists.mockResolvedValue(undefined);
+      mockVerifyRepository.mockResolvedValue(undefined);
 
       const testEmail = `test-${randomUUID()}@example.com`;
       const testRepo = `test/repo-${randomUUID()}`;
@@ -234,7 +242,7 @@ describe('Integration Tests: API Endpoints', () => {
     });
 
     it('compensates subscription saga if email command publishing fails', async () => {
-      mockCheckRepoExists.mockResolvedValue(undefined);
+      mockVerifyRepository.mockResolvedValue(undefined);
       mockAddEmail.mockRejectedValue(new Error('Redis unavailable'));
 
       const testEmail = `test-${randomUUID()}@example.com`;

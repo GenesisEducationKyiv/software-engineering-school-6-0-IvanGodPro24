@@ -43,6 +43,7 @@ describe('EmailJobHandler', () => {
 
     await handler.handle({
       type: 'new-release',
+      subscriptionId: 'subscription-1',
       email: 'user@test.com',
       repoName: 'facebook/react',
       tag: 'v19.0.0',

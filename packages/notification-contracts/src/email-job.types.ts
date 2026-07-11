@@ -9,6 +9,7 @@ export type ConfirmSubscriptionEmailJobData = {
 
 export type NewReleaseEmailJobData = {
   type: 'new-release';
+  subscriptionId: string;
   email: string;
   repoName: string;
   tag: string;

@@ -7,11 +7,13 @@ import { SubscriptionSagaCompensationService } from '../modules/subscriptions/sa
 import { SubscriptionSagaOrchestrator } from '../modules/subscriptions/saga/subscription-saga.orchestrator.js';
 import {
   subscriptionRepository,
-  githubClient,
+  repositoryVerifier,
   subscriptionQueryRepository,
 } from './shared.container.js';
-import { EmailQueueAdapter } from '../queue/email-queue.adapter.js';
-import { emailQueue } from '../queue/email.queue.js';
+import { EmailQueueAdapter } from '../queue/email/email-queue.adapter.js';
+import { emailQueue } from '../queue/email/email.queue.js';
+import { ScannerCommandQueueAdapter } from '../queue/scanner/scanner-command-queue.adapter.js';
+import { scannerCommandQueue } from '../queue/scanner/scanner-command.queue.js';
 
 const controllerLogger = new PinoLogger('SubscriptionController');
 const sagaLogger = new PinoLogger('SubscriptionSaga');
@@ -25,11 +27,15 @@ const subscriptionSagaCompensationService =
     sagaLogger,
   );
 
+const scannerCommandPublisher = new ScannerCommandQueueAdapter(
+  scannerCommandQueue,
+);
+
 export const subscriptionSagaOrchestrator = new SubscriptionSagaOrchestrator(
   prisma,
   subscriptionSagaRepository,
   subscriptionSagaCompensationService,
-  githubClient,
+  repositoryVerifier,
   emailQueueAdapter,
   sagaLogger,
 );
@@ -37,6 +43,7 @@ export const subscriptionSagaOrchestrator = new SubscriptionSagaOrchestrator(
 export const subscriptionService = new SubscriptionService(
   subscriptionRepository,
   subscriptionQueryRepository,
+  scannerCommandPublisher,
 );
 
 export const subscriptionController = new SubscriptionController(
