@@ -1,4 +1,5 @@
 import { jest } from '@jest/globals';
+import { EmailJobData } from '@github-notifier/notification-contracts';
 import { EmailJobHandler } from '../email-job.handler.js';
 import { ISubscriptionEmailService } from '../subscription-email.service.js';
 
@@ -20,6 +21,8 @@ describe('EmailJobHandler', () => {
 
     await handler.handle({
       type: 'confirm-subscription',
+      sagaId: 'saga-1',
+      subscriptionId: 'sub-1',
       email: 'user@test.com',
       repoName: 'facebook/react',
       confirmToken: 'confirm-token-123',
@@ -65,10 +68,25 @@ describe('EmailJobHandler', () => {
     await expect(
       handler.handle({
         type: 'confirm-subscription',
+        sagaId: 'saga-1',
+        subscriptionId: 'sub-1',
         email: 'user@test.com',
         repoName: 'facebook/react',
         confirmToken: 'confirm-token-123',
       }),
     ).rejects.toThrow('SMTP failed');
+  });
+
+  it('rejects an unsupported job type', async () => {
+    const unsupportedJob = {
+      type: 'unsupported-email-job',
+    } as unknown as EmailJobData;
+
+    await expect(handler.handle(unsupportedJob)).rejects.toThrow(
+      'Unsupported email job type',
+    );
+
+    expect(mockEmailService.sendConfirmEmail).not.toHaveBeenCalled();
+    expect(mockEmailService.sendNewReleaseEmail).not.toHaveBeenCalled();
   });
 });

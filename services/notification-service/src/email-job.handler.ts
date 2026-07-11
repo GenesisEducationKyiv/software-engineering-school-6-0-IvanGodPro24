@@ -22,6 +22,9 @@ export class EmailJobHandler {
           data.unsubscribeToken,
         );
         return;
+
+      default:
+        throw new Error('Unsupported email job type');
     }
   }
 }

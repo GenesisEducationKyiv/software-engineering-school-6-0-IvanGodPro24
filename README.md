@@ -7,6 +7,9 @@ A robust, production-ready REST API that allows users to subscribe to email noti
 ## 🚀 Features & Architecture
 
 - **Subscription State Machine:** Implements state machine logic (`PENDING` → `ACTIVE` → `UNSUBSCRIBED`) to ensure data integrity and seamless re-subscriptions.
+- **Orchestrated Subscription Saga:** Coordinates subscription persistence and confirmation email delivery across the Main API and Notification Service. Successful delivery completes the Saga, while final delivery failure triggers compensation.
+- **Bidirectional Asynchronous Messaging:** Uses `email-queue` for commands and `notification-result-queue` for success/failure result events.
+- **Idempotent Email Result Handling:** Stores an `email-sent` BullMQ progress checkpoint and uses deterministic result job IDs to reduce duplicate confirmation emails and duplicate result events.
 - **Race Condition Protection:** Utilizes database-level unique constraints and Prisma operations to handle concurrent duplicate requests flawlessly.
 - **Modular Monolith + Microservice:** The main API is organized into clear modules (`subscriptions`, `repositories`, `scanner`, `github`, `notifications`, `infrastructure`), while the notification/email domain is extracted into a separate `notification-service`.
 - **Background Processing:** Uses `node-cron` for scheduled repository scanning and `BullMQ` + `Redis` for reliable asynchronous communication between the main API and the notification microservice.
@@ -152,7 +155,7 @@ The project includes a fully configured monitoring stack:
 
 In Grafana, add `http://prometheus:9090` as a Prometheus data source to visualize HTTP request durations, memory usage, and Event Loop lag.
 
-> A **BullMQ Dashboard** is also available at [http://localhost:3000/admin/queues](http://localhost:3000/admin/queues) to monitor email job statuses in real time.
+> A **BullMQ Dashboard** is also available at [http://localhost:3000/admin/queues](http://localhost:3000/admin/queues). It exposes both `email-queue` and `notification-result-queue`, allowing the complete Saga command/result flow to be monitored in real time.
 
 ---
 
@@ -192,7 +195,7 @@ src/
 │   ├── repositories/        # Tracked GitHub repositories
 │   ├── scanner/             # Release scanning logic
 │   └── subscriptions/       # Subscription business flow
-├── queue/                   # BullMQ producers used by the main app
+├── queue/                   # BullMQ command and result queues
 ├── routes/                  # Root API router
 ├── shared/                  # Shared utilities and domain errors
 └── index.ts                 # Main API entry point
@@ -203,6 +206,7 @@ services/
     │   ├── templates/       # Handlebars email templates
     │   ├── email.service.ts
     │   ├── email.worker.ts
+    │   ├── notification-result.publisher.ts
     │   ├── index.ts
     │   └── subscription-email.service.ts
     ├── Dockerfile
@@ -224,6 +228,42 @@ The root application is responsible for subscription management, GitHub reposito
 
 The extracted `notification-service` is responsible for consuming email jobs from Redis/BullMQ, rendering email templates, and sending emails through SMTP. The main API no longer owns Nodemailer, SMTP integration, or email templates.
 
+### Orchestrated Subscription Saga
+
+Creating a subscription is now an asynchronous distributed process coordinated by the Main API.
+
+```txt
+Client
+  -> POST /api/subscribe
+
+Main API
+  -> creates SubscriptionSaga
+  -> creates or updates PENDING Subscription
+  -> publishes confirm-subscription to email-queue
+  -> returns 202 Accepted
+
+Notification Service
+  -> sends confirmation email through SMTP
+  -> publishes confirmation-email-sent or confirmation-email-failed
+
+Main API Notification Result Worker
+  -> success: marks Saga as COMPLETED
+  -> failure: compensates local changes and marks Saga as COMPENSATED
+```
+
+Subscription.status and SubscriptionSaga.status represent different concerns:
+
+| State                                 | Meaning                                               |
+| ------------------------------------- | ----------------------------------------------------- |
+| Subscription.PENDING                  | The user has not clicked the confirmation link yet    |
+| Subscription.ACTIVE                   | The user confirmed the subscription                   |
+| Subscription.UNSUBSCRIBED             | The user unsubscribed                                 |
+| SubscriptionSaga.EMAIL_SEND_REQUESTED | The confirmation email command was published          |
+| SubscriptionSaga.COMPLETED            | The confirmation email was successfully sent          |
+| SubscriptionSaga.COMPENSATED          | Email delivery failed and local changes were reverted |
+
+A completed Saga does not mean that the subscription is already active. It means that the distributed operation successfully created the pending subscription and delivered the confirmation email.
+
 ### Redis and BullMQ Roles
 
 Redis is used in two separate roles:
@@ -235,10 +275,14 @@ The email delivery flow is:
 
 ```txt
 Main API
-  -> publishes email command to BullMQ
-  -> Redis stores the job
-  -> Notification Service consumes the job
+  -> publishes email command to email-queue
+  -> Redis stores the command
+  -> Notification Service consumes the command
   -> SMTP provider sends email
+  -> Notification Service publishes result event
+  -> notification-result-queue stores the result
+  -> Main API consumes the result
+  -> Saga becomes COMPLETED or COMPENSATED
 ```
 
 This keeps HTTP request handling independent from email delivery. If SMTP is slow or temporarily unavailable, the API can still publish a job quickly, while BullMQ handles retries and the Notification Service processes the queue separately.

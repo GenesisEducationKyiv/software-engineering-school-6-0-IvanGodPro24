@@ -4,162 +4,205 @@
 
 ### Функціональні вимоги
 
-- Користувачі можуть підписатися на оновлення конкретного відкритого репозиторію на GitHub (наприклад, `facebook/react`).
-- Система використовує механізм підтвердження email через унікальний токен для запобігання спаму.
-- Користувач може відписатися від сповіщень через спеціальне посилання в листі.
-- Система автоматично моніторить нові релізи у вказаних репозиторіях і надсилає email-сповіщення підписникам.
+- Користувачі можуть підписатися на оновлення конкретного відкритого GitHub-репозиторію, наприклад `facebook/react`.
+- Система підтверджує email через унікальний токен, щоб запобігти небажаним підпискам.
+- Користувач може відписатися через посилання в листі.
+- Система періодично перевіряє нові релізи та надсилає email активним підписникам.
 
 ### Нефункціональні вимоги
 
 - **Надійність:** Жодне сповіщення про реліз не має бути втрачено.
-- **Швидкодія API:** Latency для клієнтських запитів (subscribe/unsubscribe) < 200ms.
-- **Масштабованість:** Можливість легкого горизонтального масштабування воркерів розсилки.
+- **Швидкодія API:** subscribe/unsubscribe не очікують SMTP-відправлення; цільова latency API — менше 200 ms, окрім зовнішньої перевірки GitHub.
+- **Масштабованість:** Можливість легкого горизонтального масштабування воркерів розсилки незалежно від Main API.
 
 ### Обмеження
 
-- **GitHub API Rate Limits:** 60 запитів/годину для неавтентифікованих запитів, або 5000 запитів/годину з токеном.
+- **GitHub API Rate Limits:** 60 запитів/годину без токена або 5000 запитів/годину з токеном.
+- PostgreSQL, Redis/BullMQ і SMTP не можуть бути учасниками однієї атомарної транзакції.
 
 ---
 
 ## 2. Оцінка навантаження
 
-Для оцінки візьмемо гіпотетичну базу у **10,000 активних підписок**.
+Оцінка базується на 10 000 активних підписок і 1 000 унікальних репозиторіїв.
 
-### Трафік
-
-- **Запити до нашого API:** ~100-200 запитів на день. Навантаження мінімальне.
-- **Запити до GitHub API:** Якщо ми маємо 1000 унікальних репозиторіїв у базі і перевіряємо їх кожні 10 хвилин: `1000 * (60/10) * 24 = 144,000 запитів/день` (або 6,000 запитів/годину).
-
-  > Оскільки 99% запитів не будуть знаходити кожен раз нові релізи, вони не будуть списуватися з ліміту GitHub, що дозволяє системі стабільно працювати навіть при такому навантаженні. Якщо реліз не змінився, GitHub просто повертає `304 Not Modified` і такі запити не списуються з ліміту.
-
-- **Відправка Email:** ~200-500 листів на день.
-
-### Дані
-
-- **Розмір запису підписки (PostgreSQL):** ~200 Bytes.
-- **Загальний розмір БД:** 10,000 записів × 200 B = ~2 MB.
-- **Redis Cache:** Кешування останніх відповідей GitHub API займе до 10-20 MB.
+- **API:** приблизно 100–200 запитів на день.
+- **GitHub API:** за сканування кожні 10 хвилин — до 144 000 запитів на день (`1000 × 6 × 24`). Умовні запити з ETag і відповіддю `304 Not Modified` зменшують фактичне споживання rate limit.
+- **Email:** приблизно 200–500 листів на день.
+- **PostgreSQL:** 10 000 записів `Subscription` по ~200 B займають орієнтовно 2 MB без урахування індексів.
+- **Redis:** кеш GitHub API орієнтовно займає 10–20 MB; BullMQ також використовує Redis для зберігання jobs.
 
 ---
 
-## 3. High-Level Архітектура
+## 3. High-Level архітектура
 
-Cистема побудована як **модульний моноліт + окремий Notification Service**.
+Система побудована як **модульний моноліт + окремий Notification Service**.
 
-Основний застосунок залишається монолітом, але всередині має чітко розділені модулі:
+Main API містить такі модулі:
 
 - **Subscriptions Module** — створення, підтвердження, скасування та перегляд підписок.
-- **Repositories Module** — робота з відстежуваними GitHub-репозиторіями.
+- **Repositories Module** — робота з відстежуваними репозиторіями.
 - **Scanner Module** — періодична перевірка нових релізів.
-- **GitHub Module** — інтеграція з GitHub API та кешування відповідей.
-- **Notifications Module** — контракт задач для черги сповіщень.
-- **Infrastructure Layer** — PostgreSQL, Redis, logger, metrics, Swagger.
+- **GitHub Module** — GitHub API та Redis-кешування.
+- **Saga Module** — координація асинхронного subscription flow і компенсація.
+- **Infrastructure Layer** — PostgreSQL, Redis, логування, метрики та Swagger.
 
-Домен email-сповіщень винесено в окремий мікросервіс:
-
-- **Notification Service** — окремий сервіс, який споживає задачі з Redis/BullMQ, рендерить Handlebars-шаблони та відправляє email через SMTP.
+Notification Service є власником email-домену: шаблонів Handlebars, SMTP-інтеграції та обробки email jobs.
 
 ```mermaid
 graph TD
     Client([Клієнт / Web Browser])
 
     API[Main API<br/>Node.js / Express<br/>Modular Monolith]
-    Subscriptions[Subscriptions Module]
-    Repositories[Repositories Module]
+    SubscriptionModule[Subscriptions Module]
+    SagaOrchestrator[Subscription Saga Orchestrator]
     Scanner[Scanner Module]
     GitHubModule[GitHub Module]
-    NotificationProducer[Notification Queue Producer]
+    ResultWorker[Notification Result Worker]
 
-    DB[(PostgreSQL<br/>Subscriptions & Repositories)]
-    Redis[(Redis<br/>BullMQ Queue & GitHub Cache)]
+    DB[(PostgreSQL<br/>Subscriptions, Repositories & Sagas)]
+    Redis[(Redis<br/>BullMQ backend & GitHub Cache)]
+    EmailQueue[[email-queue]]
+    ResultQueue[[notification-result-queue]]
 
-    NotificationService[Notification Service<br/>Node.js / TypeScript]
+    NotificationService[Notification Service]
     EmailWorker[Email Worker]
     Templates[Handlebars Templates]
     SMTP([SMTP Provider])
     GitHub([GitHub API])
 
     Client -- "POST /subscribe<br/>GET /confirm<br/>GET /unsubscribe" --> API
+    API --> SubscriptionModule
+    SubscriptionModule --> SagaOrchestrator
+    SubscriptionModule -- "Read/Write" --> DB
+    SagaOrchestrator -- "Read/Write Saga" --> DB
 
-    API --> Subscriptions
-    API --> Repositories
     API --> Scanner
-    API --> GitHubModule
-    API --> NotificationProducer
-
-    Subscriptions -- "Read/Write" --> DB
-    Repositories -- "Read/Write" --> DB
-
     Scanner -- "Fetch active repositories" --> DB
     Scanner -- "Check latest releases" --> GitHubModule
     GitHubModule -- "GitHub REST API" --> GitHub
-    GitHubModule -- "Cache ETag/latest tag" --> Redis
+    GitHubModule -- "ETag/latest tag cache" --> Redis
 
-    NotificationProducer -- "Publish email jobs" --> Redis
+    SagaOrchestrator -- "confirm-subscription command" --> EmailQueue
+    Scanner -- "new-release command" --> EmailQueue
+    EmailQueue -- "BullMQ backend" --> Redis
+    ResultQueue -- "BullMQ backend" --> Redis
 
-    NotificationService -- "Consume jobs" --> Redis
     NotificationService --> EmailWorker
+    EmailQueue -- "Consume command" --> EmailWorker
     EmailWorker --> Templates
     EmailWorker -- "Send email" --> SMTP
+    EmailWorker -- "Result event" --> ResultQueue
+    ResultQueue -- "Consume result" --> ResultWorker
+    ResultWorker -- "Complete or compensate Saga" --> DB
 
     classDef service fill:#f9f,stroke:#333,stroke-width:2px;
     classDef database fill:#bbf,stroke:#333,stroke-width:2px;
-    class API,NotificationService,EmailWorker service;
+    class API,NotificationService,EmailWorker,ResultWorker service;
     class DB,Redis database;
 ```
 
 ### Межа між модулями та мікросервісом
 
-Основний API більше не має прямої залежності від Nodemailer, SMTP або email-шаблонів. Він лише створює задачі в Redis/BullMQ:
+Main API не має прямої залежності від Nodemailer, SMTP або email-шаблонів. Він створює BullMQ jobs:
 
 ```txt
 confirm-subscription
 new-release
 ```
 
-Notification Service є власником усієї email-логіки:
-
-- вибір шаблону;
-- рендеринг HTML;
-- інтеграція з SMTP;
-- retry-логіка через BullMQ worker.
-
-Такий підхід дозволяє масштабувати розсилку незалежно від API та зменшує відповідальність основного застосунку.
+Notification Service не модифікує `Subscription`, `Repository` або `SubscriptionSaga` напряму. Результат confirmation email він повертає лише через спільні contracts і `notification-result-queue`.
 
 ---
 
-## 4. Детальний дизайн компонентів
+## 4. Оркестрована Saga підписки
 
-### 4.1. API Service
+Створення підписки є розподіленою асинхронною операцією. Main API виконує роль Saga Orchestrator і зберігає lifecycle процесу в `SubscriptionSaga`.
 
-Відповідає за REST-комунікацію з користувачами.
+```txt
+Client
+  -> POST /api/subscribe
+
+Main API
+  -> validates repository in GitHub
+  -> creates SubscriptionSaga and PENDING Subscription in PostgreSQL
+  -> publishes confirm-subscription command to email-queue
+  -> returns 202 Accepted
+
+Notification Service / EmailWorker
+  -> consumes command
+  -> sends confirmation email through SMTP
+  -> publishes confirmation-email-sent or confirmation-email-failed result event
+
+Main API / NotificationResultWorker
+  -> sent: marks Saga as COMPLETED
+  -> failed: compensates local changes and marks Saga as COMPENSATED
+```
+
+`COMPLETED` означає, що SMTP-провайдер прийняв confirmation email, а не те, що користувач уже підтвердив підписку. Після завершення Saga підписка лишається `PENDING` і переходить у `ACTIVE` лише після використання confirmation link.
+
+| `SubscriptionSaga.status` | Значення                                     |
+| ------------------------- | -------------------------------------------- |
+| `STARTED`                 | Saga створена.                               |
+| `SUBSCRIPTION_CREATED`    | `Repository` та `Subscription` підготовлені. |
+| `EMAIL_SEND_REQUESTED`    | Відправлення confirmation email запитано.    |
+| `COMPLETED`               | SMTP-провайдер прийняв confirmation email.   |
+| `COMPENSATING`            | Виконується відновлення локальних змін.      |
+| `COMPENSATED`             | Компенсацію завершено.                       |
+
+### Compensation
+
+Якщо confirmation email остаточно не відправлено, `NotificationResultWorker` запускає compensation:
+
+- для нової підписки видаляє `PENDING Subscription`;
+- якщо repository був створений цією Saga і більше не має підписок, видаляє його;
+- для повторної підписки повертає статус із `PENDING` до `UNSUBSCRIBED`.
+
+### Retries та ідемпотентність
+
+Email jobs і result jobs мають до трьох спроб з exponential backoff. Тимчасова SMTP-помилка не запускає компенсацію: `confirmation-email-failed` публікується лише під час останньої невдалої спроби.
+
+Після успішної передачі confirmation email SMTP-провайдеру Email Worker зберігає BullMQ progress `email-sent`. Якщо публікація success result event тимчасово не вдасться, наступна спроба не надсилатиме лист повторно, а повторить лише result publishing. Result jobs мають детермінований ID `${event.type}-${event.sagaId}`, що зменшує кількість дублікатів result events.
+
+### Відомі обмеження
+
+Поточна реалізація не використовує transactional outbox. Тому існують failure windows між комітом PostgreSQL і додаванням email job у BullMQ, а також під час публікації фінального failure result event. Вони можуть залишити Saga у проміжному стані без автоматичного продовження.
+
+Між успішною SMTP-відправкою та збереженням progress також можливе аварійне завершення процесу; у такому разі retry потенційно надішле email повторно. Для production-рівня гарантій потрібні transactional outbox з dispatcher-ом або процес відновлення Saga у проміжних станах, а також idempotency key на рівні email-провайдера. Деталі рішення й компромісів зафіксовані в [ADR-006](adr/0006-use-orchestrated-saga-for-subscription-flow.md).
+
+---
+
+## 5. Детальний дизайн компонентів
+
+### 5.1. API Service
 
 - **Стек:** Node.js, Express, Zod.
-- Ендпоінти не виконують важкої роботи. При запиті на підписку API створює запис у БД зі статусом `status: PENDING` і миттєво віддає задачу на відправку листа підтвердження у Redis-чергу.
+- `POST /api/subscribe` запускає Saga та повертає `202 Accepted` після постановки confirmation email command у BullMQ.
+- `GET /api/confirm/:token` переводить `Subscription` із `PENDING` у `ACTIVE`.
+- `GET /api/unsubscribe/:token` переводить підписку в `UNSUBSCRIBED`.
+- `GET /api/subscriptions?email=<email>` повертає підписки користувача; endpoint захищений заголовком `x-api-key`.
 
-### 4.2. GitHub Scanner (Worker)
+### 5.2. GitHub Scanner
 
-- Запускається періодично (через `node-cron` кожні 10 хвилин).
-- Дістає з БД список унікальних репозиторіїв, на які є хоча б одна активна підписка (`status: ACTIVE`).
-- Робить запит до GitHub API (`GET /repos/{owner}/{repo}/releases/latest`).
-- Порівнює отриманий тег із `lastSeenTag` у таблиці `Repository`.
-- Якщо є новий реліз:
-  - Оновлює `lastSeenTag` у БД.
-  - Знаходить всіх користувачів, підписаних на цей репозиторій.
-  - Створює задачі у Redis черзі на відправку сповіщень для кожного користувача.
+- Запускається через `node-cron` кожні 10 хвилин.
+- Отримує з БД унікальні репозиторії, що мають щонайменше одну активну підписку.
+- Викликає `GET /repos/{owner}/{repo}/releases/latest`, порівнює tag із `Repository.lastSeenTag` і використовує Redis для ETag-кешування.
+- За нового релізу оновлює `lastSeenTag` і створює `new-release` jobs для активних підписників.
 
-### 4.3. Message Queue & Email Worker
+### 5.3. Черги та workers
 
-Використання Redis і BullMQ дозволяє:
+BullMQ використовує Redis як backend для двох черг:
 
-- Розподілити навантаження при масовій розсилці.
-- Автоматично повторювати спроби відправки у разі тимчасової недоступності SMTP-сервера.
+- `email-queue` передає `confirm-subscription` і `new-release` commands із Main API до Notification Service;
+- `notification-result-queue` передає result events для confirmation email із Notification Service до Main API.
+
+Email Worker ізольовує SMTP-відправлення від API і дозволяє незалежно масштабувати розсилку. Notification Result Worker завершує або компенсує Saga на підставі result event.
 
 ---
 
-## 5. Схема Бази Даних
+## 6. Схема бази даних
 
-База даних нормалізована і розділена на дві таблиці: `Repository` зберігає унікальні репозиторії та стан моніторингу, `Subscription` — підписки користувачів із їхнім статусом.
+`Repository` зберігає унікальні GitHub-репозиторії та стан моніторингу. `Subscription` зберігає email і статус підписки. `SubscriptionSaga` зберігає стан розподіленої операції створення підписки.
 
 ```mermaid
 erDiagram
@@ -182,19 +225,34 @@ erDiagram
         String repositoryId FK
     }
 
+    SubscriptionSaga {
+        String id PK "uuid"
+        String email
+        String repoName
+        String repositoryId "nullable"
+        String subscriptionId "nullable"
+        Boolean createdRepository
+        Boolean createdSubscription
+        SubscriptionSagaStatus status
+        String currentStep "nullable"
+        String errorMessage "nullable"
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
     Repository ||--o{ Subscription : "has many"
 ```
 
 **Enum `SubscriptionStatus`:**
 
-| Значення       | Опис                                              |
-| -------------- | ------------------------------------------------- |
-| `PENDING`      | Підписка створена, email ще не підтверджено       |
-| `ACTIVE`       | Email підтверджено, користувач отримує сповіщення |
-| `UNSUBSCRIBED` | Користувач відписався                             |
+| Значення       | Опис                                               |
+| -------------- | -------------------------------------------------- |
+| `PENDING`      | Підписка створена, але email ще не підтверджено.   |
+| `ACTIVE`       | Email підтверджено; користувач отримує сповіщення. |
+| `UNSUBSCRIBED` | Користувач відписався.                             |
 
 **Індекси:**
 
 - `@@unique([email, repositoryId])` — гарантує, що користувач не може підписатися на один і той самий репозиторій двічі.
-- Унікальний індекс на `confirmToken` для швидкого пошуку при підтвердженні підписки.
-- Унікальний індекс на `unsubscribeToken` для швидкого пошуку при відписці.
+- Унікальні індекси на `confirmToken` та `unsubscribeToken` підтримують відповідні user flows.
+- Індекси `SubscriptionSaga.status` та `SubscriptionSaga.subscriptionId` підтримують спостереження й обробку Saga.

@@ -22,7 +22,7 @@ test.describe('Subscription e2e', () => {
     await homePage.goto();
   });
 
-  test('should successfully subscribe a new user', async () => {
+  test('should successfully start subscription saga for a new user', async () => {
     const uniqueEmail = `user${Date.now()}@e2e.com`;
     const repo = 'facebook/react';
 
@@ -30,7 +30,9 @@ test.describe('Subscription e2e', () => {
 
     await expect(homePage.messageBox).toBeVisible();
     await expect(homePage.messageBox).toHaveClass(/success/);
-    await expect(homePage.messageBox).toContainText(/Subscription created/i);
+    await expect(homePage.messageBox).toContainText(
+      /Subscription request accepted/i,
+    );
   });
 
   test('should show conflict error if already subscribed', async () => {

@@ -5,25 +5,33 @@ import {
   GetSubscriptionsInput,
 } from './subscription.schema.js';
 import { SubscriptionService } from './subscription.service.js';
+import { SubscriptionSagaOrchestrator } from './saga/subscription-saga.orchestrator.js';
 
 export class SubscriptionController {
   constructor(
     private readonly subscriptionService: SubscriptionService,
+    private readonly subscriptionSagaOrchestrator: SubscriptionSagaOrchestrator,
     private readonly logger: ILogger,
   ) {}
 
   subscribe = async (req: Request, res: Response) => {
     const { email, repo } = req.body as SubscribeInput;
 
-    await this.subscriptionService.createSubscription(email, repo);
+    const result = await this.subscriptionSagaOrchestrator.start({
+      email,
+      repoName: repo,
+    });
 
     this.logger.info(
-      { email, repo },
-      'Successfully subscribed user to repository',
+      { email, repo, sagaId: result.sagaId },
+      'Subscription saga accepted',
     );
 
-    res.status(200).json({
-      message: 'Subscription created. Please confirm your email.',
+    res.status(202).json({
+      message: 'Subscription request accepted. Please check your email.',
+      sagaId: result.sagaId,
+      subscriptionId: result.subscriptionId,
+      status: result.status,
     });
   };
 

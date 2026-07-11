@@ -12,6 +12,31 @@ SubscribeRequest:
       type: string
       description: GitHub repository in owner/repo format (e.g., golang/go)
 
+SubscriptionSagaAcceptedResponse:
+  type: object
+  required:
+  - message
+  - sagaId
+  - subscriptionId
+  - status
+  properties:
+    message:
+      type: string
+      example: Subscription request accepted. Please check your email.
+    sagaId:
+      type: string
+      format: uuid
+      description: Identifier of the subscription Saga
+    subscriptionId:
+      type: string
+      format: uuid
+      description: Identifier of the pending subscription
+    status:
+      type: string
+      enum:
+      - EMAIL_SEND_REQUESTED
+      description: Current state of the asynchronous subscription Saga
+
 Subscription:
   type: object
   properties:
