@@ -1,10 +1,8 @@
 import { jest } from '@jest/globals';
-import {
-  SubscriptionEntity,
-  TrackedRepoEntity,
-} from '../modules/subscriptions/subscription.entity.js';
+import { SubscriptionEntity } from '../modules/subscriptions/subscription.entity.js';
+import { TrackedRepoEntity } from '../modules/repositories/tracked-repo.entity.js';
 import { SubscriptionService } from '../modules/subscriptions/subscription.service.js';
-import { IEmailQueue } from '../modules/scanner/scanner.service.js';
+import { IEmailQueue } from '../queue/email-queue.port.js';
 import { TrackedRepoRepository } from '../modules/repositories/tracked-repo.repository.js';
 import { SubscriptionRepository } from '../modules/subscriptions/subscription.repository.js';
 import { IGitHubClient } from '../modules/github/github.service.js';

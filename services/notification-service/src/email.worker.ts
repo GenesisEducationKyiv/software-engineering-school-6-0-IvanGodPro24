@@ -1,33 +1,15 @@
 import { Worker, Job } from 'bullmq';
 import { Redis } from 'ioredis';
-import { ISubscriptionEmailService } from './subscription-email.service.js';
-import { ILogger } from './logger.js';
-
-export type ConfirmSubscriptionEmailJobData = {
-  type: 'confirm-subscription';
-  email: string;
-  repoName: string;
-  confirmToken: string;
-};
-
-export type NewReleaseEmailJobData = {
-  type: 'new-release';
-  email: string;
-  repoName: string;
-  tag: string;
-  unsubscribeToken: string;
-};
-
-export type EmailJobData =
-  | ConfirmSubscriptionEmailJobData
-  | NewReleaseEmailJobData;
+import { EmailJobData } from '@github-notifier/notification-contracts';
+import { ILogger } from '@github-notifier/shared';
+import { EmailJobHandler } from './email-job.handler.js';
 
 export class EmailWorker {
   private worker: Worker<EmailJobData> | null = null;
 
   constructor(
     private readonly redisConnection: Redis,
-    private readonly emailService: ISubscriptionEmailService,
+    private readonly emailJobHandler: EmailJobHandler,
     private readonly logger: ILogger,
   ) {}
 
@@ -63,24 +45,7 @@ export class EmailWorker {
       'Processing email job',
     );
 
-    switch (data.type) {
-      case 'confirm-subscription':
-        await this.emailService.sendConfirmEmail(
-          data.email,
-          data.repoName,
-          data.confirmToken,
-        );
-        return;
-
-      case 'new-release':
-        await this.emailService.sendNewReleaseEmail(
-          data.email,
-          data.repoName,
-          data.tag,
-          data.unsubscribeToken,
-        );
-        return;
-    }
+    await this.emailJobHandler.handle(data);
   }
 
   private setupListeners(): void {

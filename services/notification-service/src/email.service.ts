@@ -1,5 +1,5 @@
 import nodemailer, { Transporter } from 'nodemailer';
-import { getEnvVar } from './getEnvVar.js';
+import { getEnvVar } from '@github-notifier/shared';
 
 export interface IEmailProvider {
   sendEmail(to: string, subject: string, html: string): Promise<void>;

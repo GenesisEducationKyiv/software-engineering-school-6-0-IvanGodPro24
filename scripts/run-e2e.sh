@@ -29,9 +29,12 @@ export SMTP_HOST="localhost"
 export SMTP_PORT="1025"
 
 echo "Applying migrations..."
-npx prisma migrate deploy
+npm run db:migrate
 
-echo "Building the project"
+echo "Building shared packages..."
+npm run build:packages
+
+echo "Building the project..."
 npm run build
 
 echo "Running Playwright E2E tests..."

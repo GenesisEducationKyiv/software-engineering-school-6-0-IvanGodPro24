@@ -37,12 +37,15 @@ export class PinoLogger implements ILogger {
   info(msgOrObj: unknown, msg?: string) {
     this.log('info', msgOrObj, msg);
   }
+
   warn(msgOrObj: unknown, msg?: string) {
     this.log('warn', msgOrObj, msg);
   }
+
   error(msgOrObj: unknown, msg?: string) {
     this.log('error', msgOrObj, msg);
   }
+
   debug(msgOrObj: unknown, msg?: string) {
     this.log('debug', msgOrObj, msg);
   }

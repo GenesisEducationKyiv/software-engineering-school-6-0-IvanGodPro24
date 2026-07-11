@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { HttpError } from 'http-errors';
-import { PinoLogger } from '../infrastructure/logger/logger.js';
+import { PinoLogger } from '@github-notifier/shared';
 
 const logger = new PinoLogger('ErrorHandler');
 

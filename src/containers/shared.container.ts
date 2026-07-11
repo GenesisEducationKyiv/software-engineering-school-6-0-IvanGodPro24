@@ -1,9 +1,9 @@
 import axios from 'axios';
-import { getEnvVar } from '../shared/getEnvVar.js';
+import { getEnvVar } from '@github-notifier/shared';
+import { PinoLogger } from '@github-notifier/shared';
 import { prisma } from '../infrastructure/db/client.js';
 import { redis } from '../infrastructure/redis/redis.js';
 import { RedisCacheService } from '../infrastructure/cache/cache.service.js';
-import { PinoLogger } from '../infrastructure/logger/logger.js';
 import { GitHubClient } from '../modules/github/github.service.js';
 import { TrackedRepoRepository } from '../modules/repositories/tracked-repo.repository.js';
 import { SubscriptionRepository } from '../modules/subscriptions/subscription.repository.js';

@@ -1,7 +1,7 @@
+import { PinoLogger } from '@github-notifier/shared';
 import { ScannerService } from '../modules/scanner/scanner.service.js';
 import { EmailQueueAdapter } from '../queue/email-queue.adapter.js';
 import { emailQueue } from '../queue/email.queue.js';
-import { PinoLogger } from '../infrastructure/logger/logger.js';
 import {
   trackedRepoRepository,
   subscriptionQueryRepository,

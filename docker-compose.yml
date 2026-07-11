@@ -32,7 +32,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379
       NODE_ENV: production
-    command: sh -c "npx prisma migrate deploy && npm run start"
+    command: sh -c "npm run db:migrate && npm run start"
     logging:
       driver: gelf
       options:
@@ -41,7 +41,8 @@ services:
 
   notification-service:
     build:
-      context: ./services/notification-service
+      context: .
+      dockerfile: services/notification-service/Dockerfile
     container_name: github_notifier_notification_service
     restart: unless-stopped
     depends_on:

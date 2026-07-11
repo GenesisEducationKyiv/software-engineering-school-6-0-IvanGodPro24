@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import handlebars from 'handlebars';
-import { getEnvVar } from './getEnvVar.js';
+import { getEnvVar } from '@github-notifier/shared';
 import { IEmailProvider } from './email.service.js';
 
 export interface ISubscriptionEmailService {

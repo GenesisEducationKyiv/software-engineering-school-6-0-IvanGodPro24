@@ -1,7 +1,11 @@
-node_modules
-dist
+node_modules/
+**/node_modules/
+dist/
+**/dist/
 .env
 .git
 .gitignore
 Dockerfile
 docker-compose.yml
+playwright-report
+test-results
