@@ -2,7 +2,7 @@ import {
   IGitHubRepositoryClient,
   VerifiedRepository,
 } from './github-repository-client.port.js';
-import { RepositoryVerificationError } from '../domain/repository-verification.error.js';
+import { RepositoryVerificationError, RepositoryVerificationErrorCodes } from '../domain/repository-verification.error.js';
 
 export interface IRepositoryVerificationService {
   verify(owner: string, repository: string): Promise<VerifiedRepository>;
@@ -21,7 +21,7 @@ export class RepositoryVerificationService implements IRepositoryVerificationSer
       !REPOSITORY_PART_PATTERN.test(repository)
     ) {
       throw new RepositoryVerificationError(
-        'INVALID_ARGUMENT',
+        RepositoryVerificationErrorCodes.INVALID_ARGUMENT,
         'Invalid repository coordinates',
       );
     }

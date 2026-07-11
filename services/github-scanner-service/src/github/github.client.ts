@@ -5,7 +5,10 @@ import {
 } from '../app/github-repository-client.port.js';
 import { IGitHubReleaseClient } from '../app/github-release-client.port.js';
 import { IReleaseCache } from '../app/release-cache.port.js';
-import { RepositoryVerificationError } from '../domain/repository-verification.error.js';
+import {
+  RepositoryVerificationError,
+  RepositoryVerificationErrorCodes,
+} from '../domain/repository-verification.error.js';
 
 type GitHubRepositoryResponse = {
   full_name?: string;
@@ -98,33 +101,33 @@ export class GitHubRepositoryClient
       switch (true) {
         case status === 404:
           throw new RepositoryVerificationError(
-            'NOT_FOUND',
+            RepositoryVerificationErrorCodes.NOT_FOUND,
             'Repository not found',
           );
 
         case status === 429 ||
           (status === 403 && String(rateLimitRemaining) === '0'):
           throw new RepositoryVerificationError(
-            'RESOURCE_EXHAUSTED',
+            RepositoryVerificationErrorCodes.RESOURCE_EXHAUSTED,
             'GitHub rate limit exceeded',
           );
 
         case status === 403:
           throw new RepositoryVerificationError(
-            'PERMISSION_DENIED',
+            RepositoryVerificationErrorCodes.PERMISSION_DENIED,
             'GitHub repository access forbidden',
           );
 
         case !error.response || (status !== undefined && status >= 500):
           throw new RepositoryVerificationError(
-            'UNAVAILABLE',
+            RepositoryVerificationErrorCodes.UNAVAILABLE,
             'GitHub API is temporarily unavailable',
           );
       }
     }
 
     throw new RepositoryVerificationError(
-      'INTERNAL',
+      RepositoryVerificationErrorCodes.INTERNAL,
       'Unexpected GitHub API error',
     );
   }

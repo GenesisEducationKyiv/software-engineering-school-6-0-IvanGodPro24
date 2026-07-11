@@ -52,7 +52,6 @@ describe('SubscriptionSagaCompensationService', () => {
     mockSagaRepository.markCompensating.mockResolvedValue({} as never);
     mockSagaRepository.markCompensated.mockResolvedValue({} as never);
     mockPrisma.subscription.deleteMany.mockResolvedValue({ count: 1 });
-    mockPrisma.subscription.count.mockResolvedValue(0);
     mockPrisma.repository.deleteMany.mockResolvedValue({ count: 1 });
 
     await service.compensate('saga-1', 'SMTP failed');
@@ -69,12 +68,13 @@ describe('SubscriptionSagaCompensationService', () => {
       },
     });
 
-    expect(mockPrisma.subscription.count).toHaveBeenCalledWith({
-      where: { repositoryId: 'repo-1' },
-    });
-
     expect(mockPrisma.repository.deleteMany).toHaveBeenCalledWith({
-      where: { id: 'repo-1' },
+      where: {
+        id: 'repo-1',
+        subscriptions: {
+          none: {},
+        },
+      },
     });
 
     expect(mockSagaRepository.markCompensated).toHaveBeenCalledWith(
@@ -122,11 +122,17 @@ describe('SubscriptionSagaCompensationService', () => {
     mockSagaRepository.markCompensating.mockResolvedValue({} as never);
     mockSagaRepository.markCompensated.mockResolvedValue({} as never);
     mockPrisma.subscription.deleteMany.mockResolvedValue({ count: 1 });
-    mockPrisma.subscription.count.mockResolvedValue(1);
 
     await service.compensate('saga-1', 'SMTP failed');
 
-    expect(mockPrisma.repository.deleteMany).not.toHaveBeenCalled();
+    expect(mockPrisma.repository.deleteMany).toHaveBeenCalledWith({
+      where: {
+        id: 'repo-1',
+        subscriptions: {
+          none: {},
+        },
+      },
+    });
   });
 
   it('skips compensation if saga is already COMPLETED', async () => {
