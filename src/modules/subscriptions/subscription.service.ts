@@ -1,33 +1,20 @@
 import createHttpError from 'http-errors';
 import { randomUUID } from 'node:crypto';
-import { UniqueConstraintError } from '../domain/errors.js';
-import { SubscriptionEntity } from '../domain/subscription.entity.js';
+import { UniqueConstraintError } from '../../shared/errors.js';
+import { SubscriptionEntity } from './subscription.entity.js';
 import { ITrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
-import { ISubscriptionRepository } from '../repositories/subscription.repository.js';
-import { ISubscriptionQueryRepository } from '../repositories/subscription-query.repository.js';
-import { IGitHubClient } from './github.service.js';
-import { GithubRepoId } from '../domain/github-repo-id.js';
-
-export interface ISubscriptionEmailService {
-  sendConfirmEmail(
-    email: string,
-    repoName: string,
-    token: string,
-  ): Promise<void>;
-  sendNewReleaseEmail(
-    email: string,
-    repoName: string,
-    tag: string,
-    unsubscribeToken: string,
-  ): Promise<void>;
-}
+import { ISubscriptionRepository } from './subscription.repository.js';
+import { ISubscriptionQueryRepository } from './subscription-query.repository.js';
+import { IGitHubClient } from '../github/github.service.js';
+import { GithubRepoId } from '../repositories/github-repo-id.js';
+import { IEmailQueue } from '../scanner/scanner.service.js';
 
 export class SubscriptionService {
   constructor(
     private readonly repoRepository: ITrackedRepoRepository,
     private readonly subscriptionRepository: ISubscriptionRepository,
     private readonly subscriptionQueryRepository: ISubscriptionQueryRepository,
-    private readonly emailService: ISubscriptionEmailService,
+    private readonly emailQueue: IEmailQueue,
     private readonly githubClient: IGitHubClient,
   ) {}
 
@@ -71,11 +58,12 @@ export class SubscriptionService {
           { confirmToken: randomUUID() },
         );
 
-        await this.emailService.sendConfirmEmail(
-          updated.email,
+        await this.emailQueue.addEmail({
+          type: 'confirm-subscription',
+          email: updated.email,
           repoName,
-          updated.confirmToken,
-        );
+          confirmToken: updated.confirmToken,
+        });
 
         return updated;
       }
@@ -95,11 +83,12 @@ export class SubscriptionService {
         repository.id,
       );
 
-      await this.emailService.sendConfirmEmail(
-        subscription.email,
-        repository.name,
-        subscription.confirmToken,
-      );
+      await this.emailQueue.addEmail({
+        type: 'confirm-subscription',
+        email: subscription.email,
+        repoName: repository.name,
+        confirmToken: subscription.confirmToken,
+      });
 
       return subscription;
     } catch (error) {

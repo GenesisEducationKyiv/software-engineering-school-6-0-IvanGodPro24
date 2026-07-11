@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { HomePage } from './pages/home.page.js';
-import { prisma } from '../src/db/client.js';
+import { prisma } from '../src/infrastructure/db/client.js';
 
 test.describe('Subscription e2e', () => {
   let homePage: HomePage;

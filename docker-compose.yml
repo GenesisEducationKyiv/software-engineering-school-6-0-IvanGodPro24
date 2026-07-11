@@ -39,24 +39,22 @@ services:
         gelf-address: 'udp://127.0.0.1:12201'
         tag: 'api-server'
 
-  worker:
-    build: .
-    container_name: github_notifier_worker
+  notification-service:
+    build:
+      context: ./services/notification-service
+    container_name: github_notifier_notification_service
     restart: unless-stopped
     depends_on:
       - redis
-      - db
     env_file: .env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379
       NODE_ENV: production
-    command: npm run start:worker
     logging:
       driver: gelf
       options:
-        gelf-address: "udp://127.0.0.1:12201"
-        tag: "background-worker"
+        gelf-address: 'udp://127.0.0.1:12201'
+        tag: 'notification-service'
 
   prometheus:
     image: prom/prometheus:latest
@@ -92,7 +90,7 @@ services:
       - xpack.security.enabled=false
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
-      - "9200:9200"
+      - '9200:9200'
     volumes:
       - esdata:/usr/share/elasticsearch/data
 
@@ -102,7 +100,7 @@ services:
     volumes:
       - ./logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
     ports:
-      - "12201:12201/udp"
+      - '12201:12201/udp'
     depends_on:
       - elasticsearch
 
@@ -112,7 +110,7 @@ services:
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
     ports:
-      - "5601:5601"
+      - '5601:5601'
     depends_on:
       - elasticsearch
 

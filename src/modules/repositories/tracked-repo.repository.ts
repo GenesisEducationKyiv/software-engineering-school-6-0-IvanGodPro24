@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { TrackedRepoEntity } from '../domain/subscription.entity.js';
+import { TrackedRepoEntity } from '../subscriptions/subscription.entity.js';
 
 export interface ITrackedRepoRepository {
   upsert(name: string): Promise<TrackedRepoEntity>;

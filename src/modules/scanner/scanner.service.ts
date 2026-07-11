@@ -1,11 +1,12 @@
 import { ITrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
-import { ISubscriptionQueryRepository } from '../repositories/subscription-query.repository.js';
-import { IGitHubClient } from './github.service.js';
-import { ILogger } from '../utils/logger.js';
-import { EmailJobData } from '../queue/email.worker.js';
-import { GithubRepoId } from '../domain/github-repo-id.js';
+import { ISubscriptionQueryRepository } from '../subscriptions/subscription-query.repository.js';
+import { IGitHubClient } from '../github/github.service.js';
+import { ILogger } from '../../infrastructure/logger/logger.js';
+import { EmailJobData } from '../notifications/email-job.types.js';
+import { GithubRepoId } from '../repositories/github-repo-id.js';
 
 export interface IEmailQueue {
+  addEmail(jobData: EmailJobData): Promise<void>;
   addBulkEmails(jobsData: EmailJobData[]): Promise<void>;
 }
 
@@ -54,6 +55,7 @@ export class ScannerService {
 
             await this.emailQueue.addBulkEmails(
               subscriptions.map((sub) => ({
+                type: 'new-release',
                 email: sub.email,
                 repoName: repo.name,
                 tag: latestTag,

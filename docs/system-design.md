@@ -44,36 +44,87 @@
 
 ## 3. High-Level Архітектура
 
-Система розділена на два основні процеси: **API Server** (обслуговує користувачів) та **Background Worker** (моніторить GitHub та розсилає листи), які комунікують через базу даних та Redis.
+Cистема побудована як **модульний моноліт + окремий Notification Service**.
+
+Основний застосунок залишається монолітом, але всередині має чітко розділені модулі:
+
+- **Subscriptions Module** — створення, підтвердження, скасування та перегляд підписок.
+- **Repositories Module** — робота з відстежуваними GitHub-репозиторіями.
+- **Scanner Module** — періодична перевірка нових релізів.
+- **GitHub Module** — інтеграція з GitHub API та кешування відповідей.
+- **Notifications Module** — контракт задач для черги сповіщень.
+- **Infrastructure Layer** — PostgreSQL, Redis, logger, metrics, Swagger.
+
+Домен email-сповіщень винесено в окремий мікросервіс:
+
+- **Notification Service** — окремий сервіс, який споживає задачі з Redis/BullMQ, рендерить Handlebars-шаблони та відправляє email через SMTP.
 
 ```mermaid
 graph TD
     Client([Клієнт / Web Browser])
-    API[API Service<br/>Node.js / Express]
-    DB[(PostgreSQL<br/>Subscriptions)]
-    RedisQueue[(Redis<br/>BullMQ Queue & Cache)]
-    Scanner[GitHub Scanner<br/>Node.js Cron/Worker]
-    EmailWorker[Email Worker<br/>Node.js]
-    GitHub([GitHub API])
-    SMTP([SMTP Server / Nodemailer])
 
-    Client -- "POST /subscribe" --> API
-    Client -- "GET /confirm" --> API
-    API -- "Read/Write Users" --> DB
-    API -- "Publish Confirmation Email" --> RedisQueue
-    Scanner -- "1. Fetch Unique Repos" --> DB
-    Scanner -- "2. Check for new releases" --> GitHub
-    Scanner -- "3. Cache tag & ETag" --> RedisQueue
-    Scanner -- "4. Update last_seen_tag" --> DB
-    Scanner -- "5. Push email jobs" --> RedisQueue
-    EmailWorker -- "Consume Jobs" --> RedisQueue
-    EmailWorker -- "Send Email" --> SMTP
+    API[Main API<br/>Node.js / Express<br/>Modular Monolith]
+    Subscriptions[Subscriptions Module]
+    Repositories[Repositories Module]
+    Scanner[Scanner Module]
+    GitHubModule[GitHub Module]
+    NotificationProducer[Notification Queue Producer]
+
+    DB[(PostgreSQL<br/>Subscriptions & Repositories)]
+    Redis[(Redis<br/>BullMQ Queue & GitHub Cache)]
+
+    NotificationService[Notification Service<br/>Node.js / TypeScript]
+    EmailWorker[Email Worker]
+    Templates[Handlebars Templates]
+    SMTP([SMTP Provider])
+    GitHub([GitHub API])
+
+    Client -- "POST /subscribe<br/>GET /confirm<br/>GET /unsubscribe" --> API
+
+    API --> Subscriptions
+    API --> Repositories
+    API --> Scanner
+    API --> GitHubModule
+    API --> NotificationProducer
+
+    Subscriptions -- "Read/Write" --> DB
+    Repositories -- "Read/Write" --> DB
+
+    Scanner -- "Fetch active repositories" --> DB
+    Scanner -- "Check latest releases" --> GitHubModule
+    GitHubModule -- "GitHub REST API" --> GitHub
+    GitHubModule -- "Cache ETag/latest tag" --> Redis
+
+    NotificationProducer -- "Publish email jobs" --> Redis
+
+    NotificationService -- "Consume jobs" --> Redis
+    NotificationService --> EmailWorker
+    EmailWorker --> Templates
+    EmailWorker -- "Send email" --> SMTP
 
     classDef service fill:#f9f,stroke:#333,stroke-width:2px;
     classDef database fill:#bbf,stroke:#333,stroke-width:2px;
-    class API,Scanner,EmailWorker service;
-    class DB,RedisQueue database;
+    class API,NotificationService,EmailWorker service;
+    class DB,Redis database;
 ```
+
+### Межа між модулями та мікросервісом
+
+Основний API більше не має прямої залежності від Nodemailer, SMTP або email-шаблонів. Він лише створює задачі в Redis/BullMQ:
+
+```txt
+confirm-subscription
+new-release
+```
+
+Notification Service є власником усієї email-логіки:
+
+- вибір шаблону;
+- рендеринг HTML;
+- інтеграція з SMTP;
+- retry-логіка через BullMQ worker.
+
+Такий підхід дозволяє масштабувати розсилку незалежно від API та зменшує відповідальність основного застосунку.
 
 ---
 

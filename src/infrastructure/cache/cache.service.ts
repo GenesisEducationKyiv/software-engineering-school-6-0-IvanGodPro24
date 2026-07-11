@@ -1,5 +1,5 @@
 import { Redis } from 'ioredis';
-import { ILogger } from '../utils/logger.js';
+import { ILogger } from '../logger/logger.js';
 
 export interface ICacheService {
   get<T>(key: string): Promise<T | null>;

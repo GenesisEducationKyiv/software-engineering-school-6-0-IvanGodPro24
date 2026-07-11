@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import subscriptionRoutes from './subscription.routes.js';
+import subscriptionRoutes from '../modules/subscriptions/subscription.routes.js';
 
 const router = Router();
 

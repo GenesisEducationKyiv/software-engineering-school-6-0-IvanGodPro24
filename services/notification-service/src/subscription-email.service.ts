@@ -1,9 +1,23 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import handlebars from 'handlebars';
-import { getEnvVar } from '../utils/getEnvVar.js';
+import { getEnvVar } from './getEnvVar.js';
 import { IEmailProvider } from './email.service.js';
-import { ISubscriptionEmailService } from './subscription.service.js';
+
+export interface ISubscriptionEmailService {
+  sendConfirmEmail(
+    email: string,
+    repoName: string,
+    token: string,
+  ): Promise<void>;
+
+  sendNewReleaseEmail(
+    email: string,
+    repoName: string,
+    tag: string,
+    unsubscribeToken: string,
+  ): Promise<void>;
+}
 
 export class SubscriptionEmailService implements ISubscriptionEmailService {
   constructor(

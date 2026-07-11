@@ -8,7 +8,8 @@ A robust, production-ready REST API that allows users to subscribe to email noti
 
 - **Subscription State Machine:** Implements state machine logic (`PENDING` → `ACTIVE` → `UNSUBSCRIBED`) to ensure data integrity and seamless re-subscriptions.
 - **Race Condition Protection:** Utilizes database-level unique constraints and Prisma operations to handle concurrent duplicate requests flawlessly.
-- **Background Processing:** Uses `node-cron` for scheduled repository scanning and `BullMQ` + `Redis` for reliable, asynchronous email queuing with retry strategies (exponential backoff, 3 attempts).
+- **Modular Monolith + Microservice:** The main API is organized into clear modules (`subscriptions`, `repositories`, `scanner`, `github`, `notifications`, `infrastructure`), while the notification/email domain is extracted into a separate `notification-service`.
+- **Background Processing:** Uses `node-cron` for scheduled repository scanning and `BullMQ` + `Redis` for reliable asynchronous communication between the main API and the notification microservice.
 - **Rate Limit Handling:** Gracefully handles GitHub API `429 Too Many Requests` errors and caches API responses in Redis to minimize external calls.
 - **Production-Ready CI/CD:** Fully automated GitHub Actions pipeline (Build, Test) with zero-downtime deployment to Render via Deploy Hooks.
 
@@ -24,16 +25,16 @@ A robust, production-ready REST API that allows users to subscribe to email noti
 
 ## 🛠 Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Runtime | Node.js v22, TypeScript |
-| Framework | Express.js |
-| Database | PostgreSQL, Prisma ORM |
-| Caching & Queues | Redis, BullMQ, ioredis |
-| Mailing | Nodemailer, Handlebars (HTML templates) |
-| Testing | Jest, ts-jest, Supertest, Playwright |
-| Observability | Prometheus (`prom-client`), Grafana |
-| Containerization | Docker, Docker Compose |
+| Layer            | Technology                              |
+| ---------------- | --------------------------------------- |
+| Runtime          | Node.js v22, TypeScript                 |
+| Framework        | Express.js                              |
+| Database         | PostgreSQL, Prisma ORM                  |
+| Caching & Queues | Redis, BullMQ, ioredis                  |
+| Mailing          | Nodemailer, Handlebars (HTML templates) |
+| Testing          | Jest, ts-jest, Supertest, Playwright    |
+| Observability    | Prometheus (`prom-client`), Grafana     |
+| Containerization | Docker, Docker Compose                  |
 
 ---
 
@@ -119,8 +120,8 @@ Docker will automatically:
 1. Initialize the PostgreSQL database
 2. Run Prisma migrations (`prisma migrate deploy`)
 3. Start the API server on port `3000`
-4. Start the BullMQ email worker
-5. Launch Prometheus and Grafana
+4. Start the Notification Service for email delivery
+5. Launch Redis, Prometheus, Grafana, and the logging stack
 
 ---
 
@@ -132,12 +133,12 @@ Once the application is running, the full interactive API documentation is avail
 
 ### Endpoints
 
-| Method | Path | Description | Auth |
-|---|---|---|---|
-| `POST` | `/api/subscribe` | Subscribe an email to a GitHub repo | — |
-| `GET` | `/api/confirm/:token` | Confirm email subscription | — |
-| `GET` | `/api/unsubscribe/:token` | Unsubscribe from notifications | — |
-| `GET` | `/api/subscriptions?email=` | List active subscriptions for an email | `x-api-key` |
+| Method | Path                        | Description                            | Auth        |
+| ------ | --------------------------- | -------------------------------------- | ----------- |
+| `POST` | `/api/subscribe`            | Subscribe an email to a GitHub repo    | —           |
+| `GET`  | `/api/confirm/:token`       | Confirm email subscription             | —           |
+| `GET`  | `/api/unsubscribe/:token`   | Unsubscribe from notifications         | —           |
+| `GET`  | `/api/subscriptions?email=` | List active subscriptions for an email | `x-api-key` |
 
 ---
 
@@ -159,12 +160,12 @@ In Grafana, add `http://prometheus:9090` as a Prometheus data source to visualiz
 
 The test suite is split into unit, integration, and Playwright E2E layers.
 
-| Command | Description |
-|---|---|
-| `npm run test:unit` | Runs isolated Jest tests. |
+| Command                    | Description                                                           |
+| -------------------------- | --------------------------------------------------------------------- |
+| `npm run test:unit`        | Runs isolated Jest tests.                                             |
 | `npm run test:integration` | Runs API integration tests with test PostgreSQL and Redis containers. |
-| `npm run test:e2e` | Runs Playwright browser tests against the built app. |
-| `npm test` | Runs the full test suite in sequence. |
+| `npm run test:e2e`         | Runs Playwright browser tests against the built app.                  |
+| `npm test`                 | Runs the full test suite in sequence.                                 |
 
 Integration and E2E commands start and clean up their own Docker test infrastructure from `docker-compose.test.yml`. CI runs lint/build, unit, integration, and E2E checks as separate jobs before deployment.
 
@@ -176,20 +177,49 @@ For the full local workflow, required tools, ports, helper scripts, and report h
 
 ```bash
 src/
-├── controllers/        # Express route handlers
-├── db/                 # Prisma client singleton
-├── middleware/         # Auth, validation, error handling
-├── queue/              # BullMQ queue, worker, Redis client
-├── routes/             # Express routers
-├── services/           # Business logic (github, scanner, email)
-├── templates/          # Handlebars HTML email templates
-├── utils/              # Shared utilities (getEnvVar)
-├── validation/         # Zod schemas
-└── index.ts            # App entry point
-public/                 # Static subscription page used by the app and E2E tests
-e2e/                    # Playwright end-to-end tests
-scripts/                # Test runner helper scripts
-prisma/
-├── schema.prisma
-└── migrations/
+├── containers/              # Dependency composition for main app modules
+├── infrastructure/          # Technical infrastructure adapters
+│   ├── cache/               # Redis cache service
+│   ├── db/                  # Prisma client
+│   ├── logger/              # Pino logger
+│   ├── metrics/             # Prometheus metrics
+│   ├── redis/               # Redis connection
+│   └── swagger/             # Swagger UI setup
+├── middleware/              # Express middleware
+├── modules/                 # Modular monolith business modules
+│   ├── github/              # GitHub API integration
+│   ├── notifications/       # Queue job contracts
+│   ├── repositories/        # Tracked GitHub repositories
+│   ├── scanner/             # Release scanning logic
+│   └── subscriptions/       # Subscription business flow
+├── queue/                   # BullMQ producers used by the main app
+├── routes/                  # Root API router
+├── shared/                  # Shared utilities and domain errors
+└── index.ts                 # Main API entry point
+
+services/
+└── notification-service/    # Extracted notification microservice
+    ├── src/
+    │   ├── templates/       # Handlebars email templates
+    │   ├── email.service.ts
+    │   ├── email.worker.ts
+    │   ├── index.ts
+    │   └── subscription-email.service.ts
+    ├── Dockerfile
+    ├── package.json
+    └── tsconfig.json
+
+public/                      # Static subscription page used by the app and E2E tests
+e2e/                         # Playwright end-to-end tests
+scripts/                     # Test runner helper scripts
+prisma/                      # Prisma schema and migrations
+docs/                        # OpenAPI docs, ADRs, and system design
 ```
+
+### Architecture Summary
+
+The project now follows a **modular monolith + microservice** approach.
+
+The root application is responsible for subscription management, GitHub repository tracking, scheduled scanning, API endpoints, persistence, and publishing notification jobs.
+
+The extracted `notification-service` is responsible for consuming email jobs from Redis/BullMQ, rendering email templates, and sending emails through SMTP. The main API no longer owns Nodemailer, SMTP integration, or email templates.

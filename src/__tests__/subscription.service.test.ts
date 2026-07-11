@@ -2,16 +2,14 @@ import { jest } from '@jest/globals';
 import {
   SubscriptionEntity,
   TrackedRepoEntity,
-} from '../domain/subscription.entity.js';
-import {
-  ISubscriptionEmailService,
-  SubscriptionService,
-} from '../services/subscription.service.js';
-import { TrackedRepoRepository } from '../repositories/tracked-repo.repository.js';
-import { SubscriptionRepository } from '../repositories/subscription.repository.js';
-import { IGitHubClient } from '../services/github.service.js';
-import { SubscriptionQueryRepository } from '../repositories/subscription-query.repository.js';
-import { UniqueConstraintError } from '../domain/errors.js';
+} from '../modules/subscriptions/subscription.entity.js';
+import { SubscriptionService } from '../modules/subscriptions/subscription.service.js';
+import { IEmailQueue } from '../modules/scanner/scanner.service.js';
+import { TrackedRepoRepository } from '../modules/repositories/tracked-repo.repository.js';
+import { SubscriptionRepository } from '../modules/subscriptions/subscription.repository.js';
+import { IGitHubClient } from '../modules/github/github.service.js';
+import { SubscriptionQueryRepository } from '../modules/subscriptions/subscription-query.repository.js';
+import { UniqueConstraintError } from '../shared/errors.js';
 
 const mockRepoRepository = {
   upsert: jest.fn(),
@@ -39,10 +37,10 @@ const mockSubscriptionQueryRepository = {
   findByRepoIdAndStatus: jest.fn(),
 } as unknown as jest.Mocked<SubscriptionQueryRepository>;
 
-const mockEmailService = {
-  sendConfirmEmail: jest.fn(),
-  sendNewReleaseEmail: jest.fn(),
-} as jest.Mocked<ISubscriptionEmailService>;
+const mockEmailQueue = {
+  addEmail: jest.fn(),
+  addBulkEmails: jest.fn(),
+} as jest.Mocked<IEmailQueue>;
 
 describe('subscription.service', () => {
   let subscriptionService: SubscriptionService;
@@ -54,7 +52,7 @@ describe('subscription.service', () => {
       mockRepoRepository,
       mockSubscriptionRepository,
       mockSubscriptionQueryRepository,
-      mockEmailService,
+      mockEmailQueue,
       mockGithubClient,
     );
   });
@@ -91,11 +89,12 @@ describe('subscription.service', () => {
         'test@test.com',
         'repo-1',
       );
-      expect(mockEmailService.sendConfirmEmail).toHaveBeenCalledWith(
-        'test@test.com',
-        'golang/go',
-        'token-123',
-      );
+      expect(mockEmailQueue.addEmail).toHaveBeenCalledWith({
+        type: 'confirm-subscription',
+        email: 'test@test.com',
+        repoName: 'golang/go',
+        confirmToken: 'token-123',
+      });
     });
 
     it('throws 409 if subscription already exists', async () => {
@@ -189,11 +188,12 @@ describe('subscription.service', () => {
       'PENDING',
       expect.objectContaining({ confirmToken: expect.any(String) }),
     );
-    expect(mockEmailService.sendConfirmEmail).toHaveBeenCalledWith(
-      'test@test.com',
-      'golang/go',
-      'new-token',
-    );
+    expect(mockEmailQueue.addEmail).toHaveBeenCalledWith({
+      type: 'confirm-subscription',
+      email: 'test@test.com',
+      repoName: 'golang/go',
+      confirmToken: 'new-token',
+    });
   });
 
   describe('confirmSubscription', () => {

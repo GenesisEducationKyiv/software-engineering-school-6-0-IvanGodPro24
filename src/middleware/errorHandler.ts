@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { HttpError } from 'http-errors';
-import { PinoLogger } from '../utils/logger.js';
+import { PinoLogger } from '../infrastructure/logger/logger.js';
 
 const logger = new PinoLogger('ErrorHandler');
 

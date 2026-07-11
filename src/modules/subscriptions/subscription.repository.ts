@@ -1,9 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import { UniqueConstraintError } from '../domain/errors.js';
-import {
-  SubscriptionEntity,
-  SubStatus,
-} from '../domain/subscription.entity.js';
+import { UniqueConstraintError } from '../../shared/errors.js';
+import { SubscriptionEntity, SubStatus } from './subscription.entity.js';
 
 export interface ISubscriptionRepository {
   findByEmailAndRepoId(
