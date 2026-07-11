@@ -12,7 +12,9 @@
     "isolatedModules": true,
     "types": ["node", "jest"],
     "baseUrl": ".",
-    "paths": {}
+    "paths": {
+      "@github-notifier/*": ["packages/*/src/index.ts", "packages/*/src/*"]
+    }
   },
   "include": ["src/**/*.ts", "services/**/*.ts", "packages/**/*.ts"],
   "exclude": [
