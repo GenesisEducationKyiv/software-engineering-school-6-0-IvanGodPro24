@@ -227,7 +227,7 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant Scanner as GitHub Scanner Service
+    participant GitHubScanner as GitHub Scanner Service
     participant ScannerDB as Scanner PostgreSQL
     participant GitHub as GitHub API
     participant Redis as Redis / BullMQ
@@ -236,16 +236,17 @@ sequenceDiagram
     participant Mail as Notification Service
     participant SMTP as SMTP Provider
 
-    Scanner->>ScannerDB: load active tracked repositories
-    Scanner->>GitHub: get latest release
-    GitHub-->>Scanner: latest tag
-    Scanner->>ScannerDB: update last seen tag
-    Scanner->>Redis: publish repository-tag-updated event
-    Main->>Redis: consume scanner event
+    Note over GitHubScanner: Cron worker runs inside GitHub Scanner Service
+    GitHubScanner->>ScannerDB: load active tracked repositories
+    GitHubScanner->>GitHub: get latest release
+    GitHub-->>GitHubScanner: latest tag
+    GitHubScanner->>ScannerDB: update last seen tag
+    GitHubScanner->>Redis: publish repository-tag-updated to scanner-event-queue
+    Main->>Redis: consume repository-tag-updated from scanner-event-queue
     Main->>DB: load active subscriptions
     Main->>DB: update repository projection
-    Main->>Redis: publish new-release email jobs
-    Mail->>Redis: consume email jobs
+    Main->>Redis: publish new-release jobs to email-queue
+    Mail->>Redis: consume new-release jobs from email-queue
     Mail->>SMTP: send release notifications
 ```
 
