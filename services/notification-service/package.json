@@ -1,0 +1,30 @@
+{
+  "name": "notification-service",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest"
+  },
+  "dependencies": {
+    "@github-notifier/notification-contracts": "1.0.0",
+    "@github-notifier/shared": "1.0.0",
+    "bullmq": "^5.73.4",
+    "handlebars": "^4.7.9",
+    "ioredis": "5.10.1",
+    "nodemailer": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.9.1",
+    "@types/nodemailer": "^8.0.0",
+    "@types/pino": "^7.0.4",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.11",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  }
+}

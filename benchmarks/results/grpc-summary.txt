@@ -1,0 +1,38 @@
+
+Summary:
+  Count:	1154224
+  Total:	30.00 s
+  Slowest:	54.35 ms
+  Fastest:	0.08 ms
+  Average:	1.17 ms
+  Requests/sec:	38474.12
+
+Response time histogram:
+  0.080  [1]      |
+  5.508  [998515] |∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎
+  10.935 [1186]   |
+  16.363 [174]    |
+  21.790 [25]     |
+  27.218 [6]      |
+  32.645 [43]     |
+  38.073 [0]      |
+  43.500 [5]      |
+  48.928 [8]      |
+  54.355 [37]     |
+
+Latency distribution:
+  10 % in 0.86 ms 
+  25 % in 0.92 ms 
+  50 % in 0.98 ms 
+  75 % in 1.17 ms 
+  90 % in 1.78 ms 
+  95 % in 2.18 ms 
+  99 % in 3.47 ms 
+
+Status code distribution:
+  [Unavailable]   50 responses        
+  [OK]            1154174 responses   
+
+Error distribution:
+  [50]   rpc error: code = Unavailable desc = error reading from server: read tcp 127.0.0.1:53520->127.0.0.1:51051: use of closed network connection   
+

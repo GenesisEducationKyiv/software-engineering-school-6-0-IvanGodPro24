@@ -1,0 +1,168 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: github_notifier_db
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_INITDB_ARGS: '--locale=C'
+    ports:
+      - '5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: github_notifier_redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+
+  app:
+    build: .
+    container_name: github_notifier_app
+    restart: unless-stopped
+    depends_on:
+      - db
+      - redis
+      - github-scanner-service
+    ports:
+      - '3000:3000'
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+      SCANNER_SERVICE_GRPC_ADDRESS: github-scanner-service:50051
+      SCANNER_SERVICE_GRPC_TIMEOUT_MS: 3000
+    command: sh -c "npm run db:migrate && npm run start"
+    logging:
+      driver: gelf
+      options:
+        gelf-address: 'udp://127.0.0.1:12201'
+        tag: 'api-server'
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: services/notification-service/Dockerfile
+    container_name: github_notifier_notification_service
+    restart: unless-stopped
+    depends_on:
+      - redis
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+    logging:
+      driver: gelf
+      options:
+        gelf-address: 'udp://127.0.0.1:12201'
+        tag: 'notification-service'
+
+  scanner_db:
+    image: postgres:15-alpine
+    container_name: github_notifier_scanner_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${SCANNER_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SCANNER_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${SCANNER_POSTGRES_DB}
+    ports:
+      - '5435:5432'
+    volumes:
+      - scanner_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${SCANNER_POSTGRES_USER} -d ${SCANNER_POSTGRES_DB}',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  github-scanner-service:
+    build:
+      context: .
+      dockerfile: services/github-scanner-service/Dockerfile
+    container_name: github_notifier_github_scanner_service
+    restart: unless-stopped
+    depends_on:
+      scanner_db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    env_file: .env
+    environment:
+      SCANNER_SERVICE_REST_PORT: 3002
+      SCANNER_SERVICE_GRPC_PORT: 50051
+      SCANNER_DATABASE_URL: postgresql://${SCANNER_POSTGRES_USER}:${SCANNER_POSTGRES_PASSWORD}@scanner_db:5432/${SCANNER_POSTGRES_DB}?schema=public
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+    ports:
+      - '3002:3002'
+      - '50051:50051'
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: github_notifier_prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - '9090:9090'
+    depends_on:
+      - app
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: github_notifier_grafana
+    restart: unless-stopped
+    ports:
+      - '3001:3000'
+    depends_on:
+      - prometheus
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+
+  elasticsearch:
+    image: elasticsearch:8.13.4
+    container_name: github_notifier_es
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - '9200:9200'
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+
+  logstash:
+    image: logstash:8.13.4
+    container_name: github_notifier_logstash
+    volumes:
+      - ./logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+    ports:
+      - '12201:12201/udp'
+    depends_on:
+      - elasticsearch
+
+  kibana:
+    image: kibana:8.13.4
+    container_name: github_notifier_kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - '5601:5601'
+    depends_on:
+      - elasticsearch
+
+volumes:
+  pgdata:
+  scanner_pgdata:
+  esdata:

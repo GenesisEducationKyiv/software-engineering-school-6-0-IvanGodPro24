@@ -1,0 +1,224 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+  REDIS_URL: redis://localhost:6379
+  SCANNER_SERVICE_GRPC_ADDRESS: localhost:50051
+  SCANNER_SERVICE_GRPC_TIMEOUT_MS: 3000
+  API_KEY: super-secret-key
+  GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  SMTP_HOST: smtp.mailtrap.io
+  SMTP_PORT: 1025
+  SMTP_USER: dummy-user
+  SMTP_PASS: dummy-pass
+  SMTP_FROM: test@example.com
+  APP_URL: http://localhost:3000
+
+jobs:
+  lint-and-build:
+    name: Lint & Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint Protobuf contracts
+        run: npm run proto:lint
+
+      - name: Verify generated gRPC contracts
+        run: |
+          npm run proto:generate
+          git diff --exit-code -- packages/scanner-contracts/src/generated
+
+      - name: Build shared packages
+        run: npm run build:packages
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Build root app
+        run: npm run build
+
+      - name: Build notification service
+        run: npm run build:notification-service
+
+      - name: Build GitHub scanner service
+        run: npm run build:github-scanner-service
+        env:
+          SCANNER_DATABASE_URL: postgresql://scanner:scanner@localhost:5432/test
+
+  notification-service-tests:
+    name: Notification Service Tests
+    runs-on: ubuntu-latest
+    needs: lint-and-build
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared packages
+        run: npm run build:packages
+
+      - name: Run notification service tests
+        run: npm run test:notification-service
+
+  github-scanner-service-tests:
+    name: GitHub Scanner Service Tests
+    runs-on: ubuntu-latest
+    needs: lint-and-build
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared packages
+        run: npm run build:packages
+
+      - name: Generate Scanner Prisma client
+        run: npm run db:generate:scanner
+        env:
+          SCANNER_DATABASE_URL: postgresql://scanner:scanner@localhost:5432/test
+
+      - name: Run GitHub scanner service tests
+        run: npm run test:github-scanner-service
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint-and-build
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared packages
+        run: npm run build:packages
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Run unit tests
+        run: npm run test:unit
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: lint-and-build
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared packages
+        run: npm run build:packages
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Run integration tests
+        run: npm run test:integration
+
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: lint-and-build
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  cd:
+    name: Deploy
+    needs:
+      [
+        unit-tests,
+        integration-tests,
+        e2e-tests,
+        notification-service-tests,
+        github-scanner-service-tests,
+      ]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Trigger Render Deploy
+        run: curl -f -X POST "${{ secrets.RENDER_DEPLOY_HOOK_APP }}"

@@ -1,0 +1,61 @@
+services:
+  test_db:
+    image: postgres:15-alpine
+    container_name: github_notifier_test_db
+    environment:
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: test_db
+    ports:
+      - '5434:5432'
+
+  test_redis:
+    image: redis:7-alpine
+    container_name: github_notifier_test_redis
+    ports:
+      - '6380:6379'
+  test_smtp:
+    image: mailhog/mailhog
+    platform: linux/amd64
+    container_name: github_notifier_test_smtp
+    ports:
+      - '1025:1025'
+
+  test_scanner_db:
+    profiles:
+      - e2e
+    image: postgres:15-alpine
+    container_name: github_notifier_test_scanner_db
+    environment:
+      POSTGRES_USER: scanner_test
+      POSTGRES_PASSWORD: scanner_test_password
+      POSTGRES_DB: scanner_test_db
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U scanner_test -d scanner_test_db']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  test_scanner:
+    profiles:
+      - e2e
+    build:
+      context: .
+      dockerfile: services/github-scanner-service/Dockerfile
+    container_name: github_notifier_test_scanner
+    depends_on:
+      test_scanner_db:
+        condition: service_healthy
+      test_redis:
+        condition: service_started
+    environment:
+      SCANNER_SERVICE_REST_PORT: 3002
+      SCANNER_SERVICE_GRPC_PORT: 50051
+      SCANNER_DATABASE_URL: postgresql://scanner_test:scanner_test_password@test_scanner_db:5432/scanner_test_db?schema=public
+      REDIS_URL: redis://test_redis:6379
+      GITHUB_API_TIMEOUT_MS: 5000
+      GH_TOKEN: ${GH_TOKEN:-}
+      NODE_ENV: production
+    ports:
+      - '3002:3002'
+      - '50051:50051'

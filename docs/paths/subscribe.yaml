@@ -1,0 +1,28 @@
+post:
+  tags:
+    - subscription
+  summary: Subscribe to release notifications
+  description: Starts an asynchronous subscription Saga. The API creates or updates a pending subscription and publishes a confirmation email command to the Notification Service.
+  operationId: subscribe
+  security: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas.yaml#/SubscribeRequest
+  responses:
+    '202':
+      description: Subscription Saga accepted and confirmation email requested
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas.yaml#/SubscriptionSagaAcceptedResponse
+    '400':
+      description: Invalid input
+    '404':
+      description: Repository not found on GitHub
+    '409':
+      description: Subscription is already active or pending
+    '500':
+      description: Subscription Saga could not be started

@@ -1,0 +1,24 @@
+import { PrismaClient } from '@prisma/client';
+import { TrackedRepoEntity } from './tracked-repo.entity.js';
+
+export interface ITrackedRepoRepository {
+  findById(id: string): Promise<TrackedRepoEntity | null>;
+  updateLastSeenTag(id: string, tag: string): Promise<void>;
+}
+
+export class TrackedRepoRepository implements ITrackedRepoRepository {
+  constructor(private readonly db: PrismaClient) {}
+
+  async findById(id: string): Promise<TrackedRepoEntity | null> {
+    return this.db.repository.findUnique({
+      where: { id },
+    });
+  }
+
+  async updateLastSeenTag(id: string, tag: string): Promise<void> {
+    await this.db.repository.update({
+      where: { id },
+      data: { lastSeenTag: tag },
+    });
+  }
+}
