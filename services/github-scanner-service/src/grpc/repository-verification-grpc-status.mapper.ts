@@ -1,5 +1,5 @@
 import { status } from '@grpc/grpc-js';
-import { RepositoryVerificationErrorCode } from './repository-verification.error.js';
+import { RepositoryVerificationErrorCode } from '../domain/repository-verification.error.js';
 
 const httpStatusMap: Record<RepositoryVerificationErrorCode, number> = {
   INVALID_ARGUMENT: 400,

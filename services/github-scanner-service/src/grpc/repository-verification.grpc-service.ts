@@ -11,7 +11,7 @@ import {
 } from '@github-notifier/scanner-contracts';
 import { ILogger } from '@github-notifier/shared';
 import { IRepositoryVerificationService } from '../app/repository-verification.service.js';
-import { mapRepositoryVerificationErrorCodeToGrpcStatus } from '../domain/repository-verification-error.mapper.js';
+import { mapRepositoryVerificationErrorCodeToGrpcStatus } from './repository-verification-grpc-status.mapper.js';
 import { RepositoryVerificationError } from '../domain/repository-verification.error.js';
 
 export class RepositoryVerificationGrpcService {

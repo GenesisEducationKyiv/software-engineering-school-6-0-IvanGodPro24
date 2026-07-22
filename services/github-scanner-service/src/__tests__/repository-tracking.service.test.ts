@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import { RepositoryTrackingService } from '../app/repository-tracking.service.js';
-import { ITrackedRepositoryRepository } from '../repositories/tracked-repository.repository.js';
+import { ITrackedRepositoryRepository } from '../app/tracked-repository.repository.port.js';
 
 const mockRepository = {
   activate: jest.fn(),

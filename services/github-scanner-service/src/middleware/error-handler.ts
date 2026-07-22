@@ -3,7 +3,7 @@ import { ILogger } from '@github-notifier/shared';
 import {
   RepositoryVerificationError,
 } from '../domain/repository-verification.error.js';
-import { mapRepositoryVerificationErrorCodeToHttpStatus } from '../domain/repository-verification-error.mapper.js';
+import { mapRepositoryVerificationErrorCodeToHttpStatus } from './repository-verification-http-status.mapper.js';
 
 export const createErrorHandler =
   (logger: ILogger) =>

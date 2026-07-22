@@ -1,5 +1,5 @@
 import { SyncRepositoryTrackingCommand } from '@github-notifier/scanner-contracts';
-import { ITrackedRepositoryRepository } from '../repositories/tracked-repository.repository.js';
+import { ITrackedRepositoryRepository } from './tracked-repository.repository.port.js';
 
 export interface IRepositoryTrackingService {
   sync(command: SyncRepositoryTrackingCommand): Promise<void>;

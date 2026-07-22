@@ -1,7 +1,7 @@
 import { GitHubRepositoryName, ILogger } from '@github-notifier/shared';
 import { IGitHubReleaseClient } from './github-release-client.port.js';
 import { IScannerEventPublisher } from './scanner-event-publisher.port.js';
-import { ITrackedRepositoryRepository } from '../repositories/tracked-repository.repository.js';
+import { ITrackedRepositoryRepository } from './tracked-repository.repository.port.js';
 import { TrackedRepositoryEntity } from '../domain/tracked-repository.entity.js';
 
 export class RepositoryScannerService {

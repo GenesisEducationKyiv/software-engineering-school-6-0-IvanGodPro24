@@ -143,6 +143,8 @@ Once the application is running, the full interactive API documentation is avail
 
 > To use the `GET /api/subscriptions` endpoint, click the **Authorize** button in Swagger UI and enter the `API_KEY` value from your `.env` file.
 
+System architecture is documented in [docs/architecture.md](docs/architecture.md). Detailed flow and reliability design is documented in [docs/system-design.md](docs/system-design.md).
+
 ### Endpoints
 
 | Method | Path                        | Description                            | Auth        |
